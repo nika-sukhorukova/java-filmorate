@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
 
 import java.time.LocalDate;
 
@@ -17,7 +19,7 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new UserController();
+        controller = new UserController(new UserService(new InMemoryUserStorage()));
     }
 
     private User.UserBuilder validUser() {
@@ -58,6 +60,19 @@ class UserControllerTest {
     }
 
     @Test
+    void findById_existingUser_isReturned() {
+        User created = controller.create(validUser().build());
+
+        assertThat(controller.findById(created.getId())).isEqualTo(created);
+    }
+
+    @Test
+    void findById_unknownId_throwsNotFoundException() {
+        assertThatThrownBy(() -> controller.findById(999L))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
     void update_existingUser_isUpdated() {
         User created = controller.create(validUser().build());
 
@@ -86,5 +101,93 @@ class UserControllerTest {
     void update_unknownId_throwsNotFoundException() {
         assertThatThrownBy(() -> controller.update(validUser().id(999L).build()))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void update_keepsExistingFriends() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(validUser().email("other@mail.ru").login("other").build());
+        controller.addFriend(first.getId(), second.getId());
+
+        User updated = controller.update(validUser().id(first.getId()).email("new@mail.ru").build());
+
+        assertThat(updated.getFriends()).containsExactly(second.getId());
+    }
+
+    @Test
+    void addFriend_isMutual() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(validUser().email("other@mail.ru").login("other").build());
+
+        controller.addFriend(first.getId(), second.getId());
+
+        assertThat(controller.getFriends(first.getId())).containsExactly(second);
+        assertThat(controller.getFriends(second.getId())).containsExactly(first);
+    }
+
+    @Test
+    void addFriend_isIdempotent() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(validUser().email("other@mail.ru").login("other").build());
+
+        controller.addFriend(first.getId(), second.getId());
+        controller.addFriend(first.getId(), second.getId());
+
+        assertThat(controller.getFriends(first.getId())).hasSize(1);
+    }
+
+    @Test
+    void addFriend_self_throwsValidationException() {
+        User created = controller.create(validUser().build());
+
+        assertThatThrownBy(() -> controller.addFriend(created.getId(), created.getId()))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void addFriend_unknownUser_throwsNotFoundException() {
+        User created = controller.create(validUser().build());
+
+        assertThatThrownBy(() -> controller.addFriend(created.getId(), 999L))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void removeFriend_isMutual() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(validUser().email("other@mail.ru").login("other").build());
+        controller.addFriend(first.getId(), second.getId());
+
+        controller.removeFriend(first.getId(), second.getId());
+
+        assertThat(controller.getFriends(first.getId())).isEmpty();
+        assertThat(controller.getFriends(second.getId())).isEmpty();
+    }
+
+    @Test
+    void getFriends_withoutFriends_isEmpty() {
+        User created = controller.create(validUser().build());
+
+        assertThat(controller.getFriends(created.getId())).isEmpty();
+    }
+
+    @Test
+    void getCommonFriends_returnsIntersection() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(validUser().email("second@mail.ru").login("second").build());
+        User common = controller.create(validUser().email("common@mail.ru").login("common").build());
+
+        controller.addFriend(first.getId(), common.getId());
+        controller.addFriend(second.getId(), common.getId());
+
+        assertThat(controller.getCommonFriends(first.getId(), second.getId())).containsExactly(common);
+    }
+
+    @Test
+    void getCommonFriends_withoutIntersection_isEmpty() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(validUser().email("second@mail.ru").login("second").build());
+
+        assertThat(controller.getCommonFriends(first.getId(), second.getId())).isEmpty();
     }
 }
