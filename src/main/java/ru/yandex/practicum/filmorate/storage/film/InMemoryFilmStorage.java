@@ -41,10 +41,4 @@ public class InMemoryFilmStorage implements FilmStorage {
         log.debug("В хранилище обновлён фильм id={}", film.getId());
         return film;
     }
-
-    @Override
-    public void delete(Long id) {
-        films.remove(id);
-        log.debug("Из хранилища удалён фильм id={}", id);
-    }
 }

@@ -41,10 +41,4 @@ public class InMemoryUserStorage implements UserStorage {
         log.debug("В хранилище обновлён пользователь id={}", user.getId());
         return user;
     }
-
-    @Override
-    public void delete(Long id) {
-        users.remove(id);
-        log.debug("Из хранилища удалён пользователь id={}", id);
-    }
 }
