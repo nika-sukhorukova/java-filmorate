@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -12,6 +13,8 @@ import ru.yandex.practicum.filmorate.annotations.IsAfterCinemaBirth;
 
 
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Film.
@@ -36,4 +39,8 @@ public class Film {
     @Positive
     @NotNull
     private Integer duration;
+
+    @JsonIgnore
+    @Builder.Default
+    private final Set<Long> likes = new HashSet<>();
 }
