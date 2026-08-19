@@ -1,0 +1,79 @@
+// Filmorate — схема базы данных
+// Вставить целиком в https://dbdiagram.io/d , затем Export → PNG в docs/db-schema.png
+
+Table users {
+  id       bigint       [pk, increment]
+  email    varchar(255) [not null, unique, note: 'уникальная, содержит @']
+  login    varchar(255) [not null, unique, note: 'без пробелов']
+  name     varchar(255) [note: 'если пусто — подставляется login']
+  birthday date         [not null, note: 'не в будущем']
+
+  note: 'Пользователи сервиса'
+}
+
+Table films {
+  id            bigint       [pk, increment]
+  name          varchar(255) [not null]
+  description   varchar(200) [note: 'не более 200 символов']
+  release_date  date         [not null, note: 'не раньше 1895-12-28']
+  duration      integer      [not null, note: 'минуты, > 0']
+  mpa_rating_id integer      [not null, ref: > mpa_ratings.id]
+
+  note: 'Фильмы. Количество лайков не хранится — считается по film_likes'
+}
+
+Table mpa_ratings {
+  id          integer      [pk, increment]
+  name        varchar(10)  [not null, unique, note: 'G, PG, PG-13, R, NC-17']
+  description varchar(255) [note: 'расшифровка ограничения']
+
+  note: 'Справочник возрастных рейтингов MPA'
+}
+
+Table genres {
+  id   integer     [pk, increment]
+  name varchar(50) [not null, unique, note: 'Комедия, Драма, ...']
+
+  note: 'Справочник жанров'
+}
+
+Table friendship_statuses {
+  id   integer     [pk, increment]
+  name varchar(20) [not null, unique, note: 'UNCONFIRMED, CONFIRMED']
+
+  note: 'Справочник статусов дружбы'
+}
+
+Table film_genres {
+  film_id  bigint  [not null, ref: > films.id]
+  genre_id integer [not null, ref: > genres.id]
+
+  Indexes {
+    (film_id, genre_id) [pk]
+    genre_id
+  }
+  note: 'Жанры фильма (many-to-many)'
+}
+
+Table film_likes {
+  film_id bigint [not null, ref: > films.id]
+  user_id bigint [not null, ref: > users.id]
+
+  Indexes {
+    (film_id, user_id) [pk]
+    user_id
+  }
+  note: 'Лайки: один пользователь — один лайк на фильм'
+}
+
+Table friendships {
+  user_id   bigint  [not null, ref: > users.id, note: 'кто отправил заявку']
+  friend_id bigint  [not null, ref: > users.id, note: 'кому отправили']
+  status_id integer [not null, ref: > friendship_statuses.id]
+
+  Indexes {
+    (user_id, friend_id) [pk]
+    friend_id
+  }
+  note: 'Дружба: направленная связь со статусом, CHECK (user_id <> friend_id)'
+}
