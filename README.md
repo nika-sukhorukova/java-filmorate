@@ -5,12 +5,7 @@
 
 ## Схема базы данных
 
-![ER-диаграмма базы данных Filmorate](docs/db-schema.png)
-
 [Открыть схему в dbdiagram.io](https://dbdiagram.io/d/6a85df71fd15a881e5b9c19b)
-
-<details>
-<summary>Та же схема в виде mermaid-диаграммы</summary>
 
 ```mermaid
 erDiagram
@@ -65,8 +60,6 @@ erDiagram
     users               ||--o{ friendships : "получает заявку"
     friendship_statuses ||--o{ friendships : "определяет статус"
 ```
-
-</details>
 
 Исходник диаграммы в формате DBML лежит в [docs/filmorate.dbml](docs/filmorate.dbml) —
 его можно вставить в [dbdiagram.io](https://dbdiagram.io/d) и получить ту же схему.
