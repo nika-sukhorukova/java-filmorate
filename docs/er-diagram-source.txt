@@ -1,5 +1,5 @@
 // Filmorate — схема базы данных
-// Вставить целиком в https://dbdiagram.io/d , затем Export → PNG в docs/db-schema.png
+// Вставить целиком в https://dbdiagram.io/d , затем Export → PNG в docs/er-diagram.png
 
 Table users {
   id       bigint       [pk, increment]
