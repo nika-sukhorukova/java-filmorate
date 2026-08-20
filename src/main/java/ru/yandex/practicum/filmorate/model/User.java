@@ -11,8 +11,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 @Data
 @Builder
@@ -38,6 +38,6 @@ public class User {
 
     @JsonIgnore
     @Builder.Default
-    private final Set<Long> friends = new HashSet<>();
+    private final Map<Long, FriendshipStatus> friends = new HashMap<>();
 }
 

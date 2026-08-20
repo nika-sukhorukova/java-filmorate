@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.FriendshipStatus;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
@@ -47,7 +48,7 @@ public class UserService {
 
         User stored = findById(user.getId());
         applyNameFallback(user);
-        user.getFriends().addAll(stored.getFriends());
+        user.getFriends().putAll(stored.getFriends());
 
         User updated = userStorage.update(user);
         log.info("Данные пользователя с id {} успешно обновлены: {}", updated.getId(), updated);
@@ -62,8 +63,8 @@ public class UserService {
             throw new ValidationException("Нельзя добавить в друзья самого себя");
         }
 
-        user.getFriends().add(friendId);
-        friend.getFriends().add(id);
+        user.getFriends().put(friendId, FriendshipStatus.CONFIRMED);
+        friend.getFriends().put(id, FriendshipStatus.CONFIRMED);
         log.info("Пользователи {} и {} теперь друзья", id, friendId);
     }
 
@@ -77,7 +78,7 @@ public class UserService {
     }
 
     public Collection<User> getFriends(Long id) {
-        Set<Long> friendIds = findById(id).getFriends();
+        Set<Long> friendIds = findById(id).getFriends().keySet();
         log.debug("У пользователя {} найдено {} друзей", id, friendIds.size());
         return friendIds.stream()
                 .map(this::findById)
@@ -85,8 +86,8 @@ public class UserService {
     }
 
     public Collection<User> getCommonFriends(Long id, Long otherId) {
-        Set<Long> friendIds = findById(id).getFriends();
-        Set<Long> otherFriendIds = findById(otherId).getFriends();
+        Set<Long> friendIds = findById(id).getFriends().keySet();
+        Set<Long> otherFriendIds = findById(otherId).getFriends().keySet();
 
         List<User> common = friendIds.stream()
                 .filter(otherFriendIds::contains)

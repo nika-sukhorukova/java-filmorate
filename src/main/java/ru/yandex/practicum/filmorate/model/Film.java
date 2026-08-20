@@ -40,6 +40,11 @@ public class Film {
     @NotNull
     private Integer duration;
 
+    @Builder.Default
+    private Set<Genre> genres = new HashSet<>();
+
+    private MpaRating mpa;
+
     @JsonIgnore
     @Builder.Default
     private final Set<Long> likes = new HashSet<>();
