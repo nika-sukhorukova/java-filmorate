@@ -111,7 +111,7 @@ class UserControllerTest {
 
         User updated = controller.update(validUser().id(first.getId()).email("new@mail.ru").build());
 
-        assertThat(updated.getFriends()).containsExactly(second.getId());
+        assertThat(updated.getFriends()).containsOnlyKeys(second.getId());
     }
 
     @Test
