@@ -3,6 +3,42 @@
 Сервис для работы с фильмами и пользовательскими оценками: пользователи добавляют фильмы,
 ставят лайки, дружат между собой и получают список самых популярных фильмов.
 
+## Хранение данных
+
+Данные хранятся в базе H2 и переживают перезапуск приложения. В рабочем режиме база лежит
+в файле `./db/filmorate`, в тестах поднимается резидентная база в памяти. Структура
+создаётся из `src/main/resources/schema.sql`, справочники жанров, рейтингов и статусов
+дружбы заполняются из `src/main/resources/data.sql` (через `MERGE`, поэтому повторный
+запуск не плодит дубликаты).
+
+Доступ к данным изолирован в DAO: `UserDbStorage`, `FilmDbStorage`, `GenreDbStorage` и
+`MpaDbStorage` реализуют интерфейсы хранилищ поверх `JdbcTemplate`. Сервисы получают нужную
+реализацию через `@Qualifier`, а интеграционные тесты (`DbStorageIntegrationTests`,
+аннотация `@JdbcTest`) проверяют все публичные методы хранилищ на чистой базе.
+
+## Эндпоинты
+
+| Метод и путь | Назначение |
+|---|---|
+| `GET /users`, `GET /users/{id}` | все пользователи, пользователь по идентификатору |
+| `POST /users`, `PUT /users` | создание и обновление пользователя |
+| `PUT /users/{id}/friends/{friendId}` | добавить друга (связь односторонняя) |
+| `DELETE /users/{id}/friends/{friendId}` | удалить друга из своего списка |
+| `GET /users/{id}/friends` | друзья пользователя |
+| `GET /users/{id}/friends/common/{otherId}` | общие друзья двух пользователей |
+| `GET /films`, `GET /films/{id}` | все фильмы, фильм по идентификатору |
+| `POST /films`, `PUT /films` | создание и обновление фильма |
+| `PUT /films/{id}/like/{userId}` | поставить лайк |
+| `DELETE /films/{id}/like/{userId}` | снять лайк |
+| `GET /films/popular?count=N` | N самых популярных фильмов |
+| `GET /genres`, `GET /genres/{id}` | справочник жанров |
+| `GET /mpa`, `GET /mpa/{id}` | справочник возрастных рейтингов |
+
+При создании и обновлении фильма достаточно передать идентификаторы: `"mpa": {"id": 3}` и
+`"genres": [{"id": 1}, {"id": 2}]`. В ответе возвращаются полные объекты с названиями,
+жанры — без дубликатов и упорядоченные по идентификатору. Несуществующий жанр или рейтинг
+приводит к ответу `404`.
+
 ## Схема базы данных
 
 ![ER-диаграмма базы данных Filmorate](docs/er-diagram.png)
@@ -95,7 +131,7 @@ erDiagram
 | `description` | `varchar(200)` | ограничение длины из ТЗ |
 | `release_date` | `date` | `NOT NULL` |
 | `duration` | `integer` | `NOT NULL`, `CHECK (duration > 0)`, минуты |
-| `mpa_rating_id` | `integer` | FK → `mpa_ratings.id`, у фильма ровно один рейтинг |
+| `mpa_rating_id` | `integer` | FK → `mpa_ratings.id`, не более одного рейтинга; может быть пустым |
 
 Количество лайков в `films` не хранится: это производное значение, оно вычисляется по
 `film_likes`. Отдельная колонка означала бы два источника правды и рассинхронизацию при
@@ -123,15 +159,20 @@ erDiagram
 пользователь ставит фильму не более одного лайка, повторный запрос упадёт на уровне базы,
 а не на уровне проверки в сервисе.
 
-**`friendships`** — дружеские связи. Связь направленная: `user_id` — тот, кто отправил
-заявку, `friend_id` — получатель, `status_id` — текущий статус. Одна заявка = одна строка,
-встречной записи при подтверждении не создаётся, меняется только статус.
+**`friendships`** — дружеские связи. Связь односторонняя: `user_id` — тот, кто добавил
+друга, `friend_id` — тот, кого добавили, `status_id` — статус связи. В список друзей
+пользователя попадают только те, кого он добавил сам; обратная запись при этом не
+создаётся.
 
 Ограничения таблицы:
 
 * `PRIMARY KEY (user_id, friend_id)` — повторные заявки от того же пользователя тому же
-  невозможны;
+  невозможны, поэтому добавление в друзья идемпотентно;
 * `CHECK (user_id <> friend_id)` — нельзя добавить в друзья самого себя.
+
+Пара встречных строк `A → B` и `B → A` допустима: это и есть подтверждённая дружба. Когда
+второй пользователь добавляет первого, обе строки получают статус `CONFIRMED`; при удалении
+одной из них оставшаяся возвращается в `UNCONFIRMED`.
 
 Внешние ключи на `films` и `users` объявлены с `ON DELETE CASCADE`: при удалении фильма
 или пользователя его лайки, жанровые связи и дружеские связи уходят вместе с ним. Ссылки
@@ -219,9 +260,9 @@ WHERE id = ?;
 
 ```sql
 SELECT u.id, u.email, u.login, u.name, u.birthday
-FROM friendships AS f
-JOIN users AS u ON u.id = f.friend_id
-WHERE f.user_id = ?;
+FROM users AS u
+WHERE u.id IN (SELECT friend_id FROM friendships WHERE user_id = ?)
+ORDER BY u.id;
 ```
 
 ### Только подтверждённые друзья
@@ -254,12 +295,13 @@ WHERE f.friend_id = ?
 ```sql
 SELECT u.id, u.login, u.name
 FROM users AS u
-JOIN friendships AS f1 ON f1.friend_id = u.id AND f1.user_id = ?
-JOIN friendships AS f2 ON f2.friend_id = u.id AND f2.user_id = ?;
+WHERE u.id IN (SELECT friend_id FROM friendships WHERE user_id = ?)
+  AND u.id IN (SELECT friend_id FROM friendships WHERE user_id = ?)
+ORDER BY u.id;
 ```
 
-Два `JOIN` к одной таблице оставляют только тех пользователей, которые есть в списках
-друзей обоих — это и есть пересечение.
+Каждый подзапрос — список друзей одного пользователя, а `IN` по обоим оставляет только
+пересечение.
 
 ### Лайк фильму
 
@@ -273,16 +315,32 @@ DELETE FROM film_likes
 WHERE film_id = ? AND user_id = ?;
 ```
 
-### Заявка в друзья и её подтверждение
+### Добавление в друзья
+
+`MERGE` делает операцию идемпотентной: повторное добавление того же друга не создаёт
+дубликат и не меняет уже выставленный статус:
 
 ```sql
-INSERT INTO friendships (user_id, friend_id, status_id)
-VALUES (?, ?, (SELECT id FROM friendship_statuses WHERE name = 'UNCONFIRMED'));
+MERGE INTO friendships (user_id, friend_id, status_id) KEY (user_id, friend_id)
+VALUES (?, ?, ?);
 ```
+
+### Подтверждение дружбы
+
+Если встречная строка уже есть, обе связи переводятся в `CONFIRMED`:
 
 ```sql
 UPDATE friendships
 SET status_id = (SELECT id FROM friendship_statuses WHERE name = 'CONFIRMED')
+WHERE user_id = ? AND friend_id = ?;
+```
+
+### Удаление из друзей
+
+Удаляется только своя связь, встречная остаётся и возвращается в `UNCONFIRMED`:
+
+```sql
+DELETE FROM friendships
 WHERE user_id = ? AND friend_id = ?;
 ```
 
