@@ -5,9 +5,13 @@ import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.InMemoryFilmGenreStorage;
+import ru.yandex.practicum.filmorate.storage.InMemoryGenreStorage;
+import ru.yandex.practicum.filmorate.storage.InMemoryMpaStorage;
 import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
 
@@ -24,7 +28,12 @@ class FilmControllerTest {
     @BeforeEach
     void setUp() {
         InMemoryUserStorage userStorage = new InMemoryUserStorage();
-        controller = new FilmController(new FilmService(new InMemoryFilmStorage(), userStorage));
+        controller = new FilmController(new FilmService(
+                new InMemoryFilmStorage(),
+                userStorage,
+                new InMemoryGenreStorage(),
+                new InMemoryFilmGenreStorage(),
+                new InMemoryMpaStorage()));
         userController = new UserController(new UserService(userStorage));
     }
 
@@ -33,7 +42,8 @@ class FilmControllerTest {
                 .name("Интерстеллар")
                 .description("Фильм про космос")
                 .releaseDate(LocalDate.of(2014, 11, 6))
-                .duration(169);
+                .duration(169)
+                .mpa(Mpa.builder().id(1).build());
     }
 
     private User createUser(String login) {
@@ -99,24 +109,36 @@ class FilmControllerTest {
 
     @Test
     void update_keepsExistingLikes() {
-        Film created = controller.create(validFilm().build());
+        Film liked = controller.create(validFilm().name("С лайком").build());
+        Film withoutLikes = controller.create(validFilm().name("Без лайков").build());
         User user = createUser("liker");
-        controller.addLike(created.getId(), user.getId());
+        controller.addLike(liked.getId(), user.getId());
 
-        Film updated = controller.update(validFilm().id(created.getId()).name("Новое имя").build());
+        controller.update(validFilm().id(liked.getId()).name("Новое имя").build());
 
-        assertThat(updated.getLikes()).containsExactly(user.getId());
+        assertThat(controller.getPopular(10)).first()
+                .extracting(Film::getId)
+                .isEqualTo(liked.getId());
+        assertThat(controller.getPopular(10)).last()
+                .extracting(Film::getId)
+                .isEqualTo(withoutLikes.getId());
     }
 
     @Test
     void addLike_isIdempotent() {
-        Film created = controller.create(validFilm().build());
-        User user = createUser("liker");
+        Film twiceLikedBySameUser = controller.create(validFilm().name("Один лайкнул дважды").build());
+        Film likedByTwoUsers = controller.create(validFilm().name("Двое лайкнули").build());
+        User first = createUser("first");
+        User second = createUser("second");
 
-        controller.addLike(created.getId(), user.getId());
-        controller.addLike(created.getId(), user.getId());
+        controller.addLike(twiceLikedBySameUser.getId(), first.getId());
+        controller.addLike(twiceLikedBySameUser.getId(), first.getId());
+        controller.addLike(likedByTwoUsers.getId(), first.getId());
+        controller.addLike(likedByTwoUsers.getId(), second.getId());
 
-        assertThat(controller.findById(created.getId()).getLikes()).hasSize(1);
+        assertThat(controller.getPopular(10)).first()
+                .extracting(Film::getId)
+                .isEqualTo(likedByTwoUsers.getId());
     }
 
     @Test
@@ -129,13 +151,17 @@ class FilmControllerTest {
 
     @Test
     void removeLike_dropsLike() {
-        Film created = controller.create(validFilm().build());
+        Film unliked = controller.create(validFilm().name("Лайк снят").build());
+        Film liked = controller.create(validFilm().name("Лайк остался").build());
         User user = createUser("liker");
-        controller.addLike(created.getId(), user.getId());
+        controller.addLike(unliked.getId(), user.getId());
+        controller.addLike(liked.getId(), user.getId());
 
-        controller.removeLike(created.getId(), user.getId());
+        controller.removeLike(unliked.getId(), user.getId());
 
-        assertThat(controller.findById(created.getId()).getLikes()).isEmpty();
+        assertThat(controller.getPopular(10)).first()
+                .extracting(Film::getId)
+                .isEqualTo(liked.getId());
     }
 
     @Test

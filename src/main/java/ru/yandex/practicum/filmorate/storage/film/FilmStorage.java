@@ -14,4 +14,13 @@ public interface FilmStorage {
     Film create(Film film);
 
     Film update(Film film);
+
+    void addLike(Long filmId, Long userId);
+
+    void removeLike(Long filmId, Long userId);
+
+    /**
+     * Возвращает фильмы, отсортированные по числу лайков по убыванию.
+     */
+    Collection<Film> findPopular(int count);
 }
