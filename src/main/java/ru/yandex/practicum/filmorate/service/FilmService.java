@@ -10,12 +10,14 @@ import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.genre.FilmGenreStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
 import ru.yandex.practicum.filmorate.storage.mpa.MpaStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -28,26 +30,31 @@ public class FilmService {
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
     private final GenreStorage genreStorage;
+    private final FilmGenreStorage filmGenreStorage;
     private final MpaStorage mpaStorage;
 
     @Autowired
     public FilmService(@Qualifier("filmDbStorage") FilmStorage filmStorage,
                        @Qualifier("userDbStorage") UserStorage userStorage,
                        GenreStorage genreStorage,
+                       FilmGenreStorage filmGenreStorage,
                        MpaStorage mpaStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
         this.genreStorage = genreStorage;
+        this.filmGenreStorage = filmGenreStorage;
         this.mpaStorage = mpaStorage;
     }
 
     public Collection<Film> findAll() {
-        return filmStorage.findAll();
+        return withGenres(filmStorage.findAll());
     }
 
     public Film findById(Long id) {
-        return filmStorage.findById(id)
+        Film film = filmStorage.findById(id)
                 .orElseThrow(() -> new NotFoundException("Фильм c id=" + id + " не найден"));
+        film.setGenres(filmGenreStorage.findByFilmId(id));
+        return film;
     }
 
     public Film create(Film film) {
@@ -55,6 +62,7 @@ public class FilmService {
         resolveGenres(film);
 
         Film created = filmStorage.create(film);
+        filmGenreStorage.save(created.getId(), created.getGenres());
         log.info("Добавлен новый фильм: {} {}", created.getId(), created.getName());
         return created;
     }
@@ -70,6 +78,8 @@ public class FilmService {
         resolveGenres(film);
 
         Film updated = filmStorage.update(film);
+        filmGenreStorage.deleteByFilmId(updated.getId());
+        filmGenreStorage.save(updated.getId(), updated.getGenres());
         log.info("Данные фильма с id {} успешно обновлены: {}", updated.getId(), updated);
         return updated;
     }
@@ -96,7 +106,21 @@ public class FilmService {
         }
 
         log.debug("Запрошены {} самых популярных фильмов", count);
-        return filmStorage.findPopular(count);
+        return withGenres(filmStorage.findPopular(count));
+    }
+
+    /**
+     * Подставляет жанры сразу всей выборке — одним запросом вместо запроса на каждый фильм.
+     */
+    private Collection<Film> withGenres(Collection<Film> films) {
+        if (films.isEmpty()) {
+            return films;
+        }
+
+        List<Long> filmIds = films.stream().map(Film::getId).toList();
+        Map<Long, Set<Genre>> genresByFilmId = filmGenreStorage.findByFilmIds(filmIds);
+        films.forEach(film -> film.setGenres(genresByFilmId.getOrDefault(film.getId(), new LinkedHashSet<>())));
+        return films;
     }
 
     private void checkUserExists(Long userId) {
@@ -111,8 +135,8 @@ public class FilmService {
      */
     private void resolveMpa(Film film) {
         Mpa mpa = film.getMpa();
-        if (mpa == null || mpa.getId() == null) {
-            return;
+        if (mpa.getId() == null) {
+            throw new ValidationException("У рейтинга MPA должен быть указан id");
         }
 
         Mpa stored = mpaStorage.findById(mpa.getId())
@@ -125,8 +149,7 @@ public class FilmService {
      */
     private void resolveGenres(Film film) {
         Set<Genre> genres = film.getGenres();
-        if (genres == null || genres.isEmpty()) {
-            film.setGenres(new LinkedHashSet<>());
+        if (genres.isEmpty()) {
             return;
         }
 

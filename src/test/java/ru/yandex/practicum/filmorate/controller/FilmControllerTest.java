@@ -5,9 +5,11 @@ import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.InMemoryFilmGenreStorage;
 import ru.yandex.practicum.filmorate.storage.InMemoryGenreStorage;
 import ru.yandex.practicum.filmorate.storage.InMemoryMpaStorage;
 import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
@@ -30,6 +32,7 @@ class FilmControllerTest {
                 new InMemoryFilmStorage(),
                 userStorage,
                 new InMemoryGenreStorage(),
+                new InMemoryFilmGenreStorage(),
                 new InMemoryMpaStorage()));
         userController = new UserController(new UserService(userStorage));
     }
@@ -39,7 +42,8 @@ class FilmControllerTest {
                 .name("Интерстеллар")
                 .description("Фильм про космос")
                 .releaseDate(LocalDate.of(2014, 11, 6))
-                .duration(169);
+                .duration(169)
+                .mpa(Mpa.builder().id(1).build());
     }
 
     private User createUser(String login) {

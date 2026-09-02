@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS films (
     description   VARCHAR(200),
     release_date  DATE NOT NULL,
     duration      INTEGER NOT NULL,
-    mpa_rating_id INTEGER REFERENCES mpa_ratings (id) ON DELETE RESTRICT,
+    mpa_rating_id INTEGER NOT NULL REFERENCES mpa_ratings (id) ON DELETE RESTRICT,
     CONSTRAINT films_duration_positive CHECK (duration > 0)
 );
 

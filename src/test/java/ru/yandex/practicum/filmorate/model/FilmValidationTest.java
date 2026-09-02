@@ -34,7 +34,8 @@ class FilmValidationTest {
                 .name("Интерстеллар")
                 .description("Фильм про космос")
                 .releaseDate(LocalDate.of(2014, 11, 6))
-                .duration(169);
+                .duration(169)
+                .mpa(Mpa.builder().id(1).name("G").build());
     }
 
     private boolean hasViolationOn(Set<ConstraintViolation<Film>> violations, String property) {
@@ -122,5 +123,19 @@ class FilmValidationTest {
     @Test
     void duration_negative_isInvalid() {
         assertThat(hasViolationOn(validator.validate(validFilm().duration(-1).build()), "duration")).isTrue();
+    }
+
+    // --- mpa (обязательный рейтинг) ---
+
+    @Test
+    void mpa_null_isInvalid() {
+        assertThat(hasViolationOn(validator.validate(validFilm().mpa(null).build()), "mpa")).isTrue();
+    }
+
+    @Test
+    void mpa_present_isValid() {
+        Film film = validFilm().mpa(Mpa.builder().id(3).name("PG-13").build()).build();
+
+        assertThat(hasViolationOn(validator.validate(film), "mpa")).isFalse();
     }
 }

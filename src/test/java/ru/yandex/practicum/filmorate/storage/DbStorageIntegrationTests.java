@@ -12,14 +12,15 @@ import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
+import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.mpa.MpaDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -31,13 +32,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @JdbcTest
 @AutoConfigureTestDatabase
-@Import({UserDbStorage.class, FilmDbStorage.class, GenreDbStorage.class, MpaDbStorage.class})
+@Import({UserDbStorage.class, FilmDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
+        MpaDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class DbStorageIntegrationTests {
 
     private final UserDbStorage userStorage;
     private final FilmDbStorage filmStorage;
     private final GenreDbStorage genreStorage;
+    private final FilmGenreDbStorage filmGenreStorage;
     private final MpaDbStorage mpaStorage;
     private final JdbcTemplate jdbcTemplate;
 
@@ -168,45 +171,67 @@ class DbStorageIntegrationTests {
     }
 
     @Test
-    void createFilm_savesMpaAndGenres() {
-        Film film = validFilm("Интерстеллар")
-                .genres(new LinkedHashSet<>(List.of(
-                        Genre.builder().id(1).build(),
-                        Genre.builder().id(2).build())))
-                .build();
-
-        Film created = filmStorage.create(film);
+    void createFilm_savesFieldsAndMpa() {
+        Film created = filmStorage.create(validFilm("Интерстеллар").build());
 
         assertThat(filmStorage.findById(created.getId()))
                 .isPresent()
                 .hasValueSatisfying(stored -> {
                     assertThat(stored.getName()).isEqualTo("Интерстеллар");
+                    assertThat(stored.getDescription()).isEqualTo("Описание Интерстеллар");
+                    assertThat(stored.getDuration()).isEqualTo(169);
                     assertThat(stored.getMpa().getName()).isEqualTo("G");
-                    assertThat(stored.getGenres()).extracting(Genre::getId).containsExactly(1, 2);
                 });
     }
 
     @Test
-    void createFilm_withoutMpa_isStored() {
-        Film created = filmStorage.create(validFilm("Без рейтинга").mpa(null).build());
+    void saveFilmGenres_storesAndReadsBack() {
+        Film created = filmStorage.create(validFilm("С жанрами").build());
 
-        assertThat(filmStorage.findById(created.getId()))
-                .get()
-                .hasFieldOrPropertyWithValue("mpa", null);
+        filmGenreStorage.save(created.getId(), List.of(
+                Genre.builder().id(1).build(),
+                Genre.builder().id(2).build()));
+
+        assertThat(filmGenreStorage.findByFilmId(created.getId()))
+                .extracting(Genre::getId)
+                .containsExactly(1, 2);
     }
 
     @Test
-    void createFilm_withDuplicateGenres_savesGenreOnce() {
-        Set<Genre> duplicates = new LinkedHashSet<>();
-        duplicates.add(Genre.builder().id(3).build());
-        duplicates.add(Genre.builder().id(3).name("Мультфильм").build());
+    void findFilmGenresByFilmIds_groupsByFilm() {
+        Film first = filmStorage.create(validFilm("Первый").build());
+        Film second = filmStorage.create(validFilm("Второй").build());
+        filmGenreStorage.save(first.getId(), List.of(Genre.builder().id(1).build()));
+        filmGenreStorage.save(second.getId(), List.of(
+                Genre.builder().id(2).build(),
+                Genre.builder().id(6).build()));
 
-        Film created = filmStorage.create(validFilm("С дублями").genres(duplicates).build());
+        Map<Long, Set<Genre>> genres = filmGenreStorage.findByFilmIds(List.of(first.getId(), second.getId()));
 
-        assertThat(filmStorage.findById(created.getId()))
-                .get()
-                .extracting(Film::getGenres)
-                .satisfies(genres -> assertThat(genres).hasSize(1));
+        assertThat(genres.get(first.getId())).extracting(Genre::getId).containsExactly(1);
+        assertThat(genres.get(second.getId())).extracting(Genre::getId).containsExactly(2, 6);
+    }
+
+    @Test
+    void findFilmGenresByFilmIds_emptyInput_returnsEmptyMap() {
+        assertThat(filmGenreStorage.findByFilmIds(List.of())).isEmpty();
+    }
+
+    @Test
+    void findFilmGenresByFilmId_withoutGenres_isEmpty() {
+        Film created = filmStorage.create(validFilm("Без жанров").build());
+
+        assertThat(filmGenreStorage.findByFilmId(created.getId())).isEmpty();
+    }
+
+    @Test
+    void deleteFilmGenres_dropsAllLinks() {
+        Film created = filmStorage.create(validFilm("С жанрами").build());
+        filmGenreStorage.save(created.getId(), List.of(Genre.builder().id(1).build()));
+
+        filmGenreStorage.deleteByFilmId(created.getId());
+
+        assertThat(filmGenreStorage.findByFilmId(created.getId())).isEmpty();
     }
 
     @Test
@@ -223,14 +248,11 @@ class DbStorageIntegrationTests {
     }
 
     @Test
-    void updateFilm_changesFieldsAndGenres() {
-        Film created = filmStorage.create(validFilm("Старое название")
-                .genres(new LinkedHashSet<>(List.of(Genre.builder().id(1).build())))
-                .build());
+    void updateFilm_changesFieldsAndMpa() {
+        Film created = filmStorage.create(validFilm("Старое название").build());
 
         created.setName("Новое название");
         created.setMpa(Mpa.builder().id(4).build());
-        created.setGenres(new LinkedHashSet<>(List.of(Genre.builder().id(6).build())));
         filmStorage.update(created);
 
         assertThat(filmStorage.findById(created.getId()))
@@ -238,7 +260,6 @@ class DbStorageIntegrationTests {
                 .hasValueSatisfying(stored -> {
                     assertThat(stored.getName()).isEqualTo("Новое название");
                     assertThat(stored.getMpa().getId()).isEqualTo(4);
-                    assertThat(stored.getGenres()).extracting(Genre::getId).containsExactly(6);
                 });
     }
 
