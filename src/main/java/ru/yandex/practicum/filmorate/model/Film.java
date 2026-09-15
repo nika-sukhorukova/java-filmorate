@@ -1,6 +1,5 @@
 package ru.yandex.practicum.filmorate.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -11,14 +10,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import ru.yandex.practicum.filmorate.annotations.IsAfterCinemaBirth;
 
-
 import java.time.LocalDate;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * Film.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -40,12 +35,15 @@ public class Film {
     @NotNull
     private Integer duration;
 
+    /**
+     * Жанры фильма. При создании и обновлении достаточно передать идентификаторы.
+     */
     @Builder.Default
-    private Set<Genre> genres = new HashSet<>();
+    private Set<Genre> genres = new LinkedHashSet<>();
 
-    private MpaRating mpa;
-
-    @JsonIgnore
-    @Builder.Default
-    private final Set<Long> likes = new HashSet<>();
+    /**
+     * Возрастной рейтинг MPA. При создании и обновлении достаточно передать идентификатор.
+     */
+    @NotNull(message = "Возрастной рейтинг MPA должен быть указан")
+    private Mpa mpa;
 }

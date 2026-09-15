@@ -109,20 +109,20 @@ class UserControllerTest {
         User second = controller.create(validUser().email("other@mail.ru").login("other").build());
         controller.addFriend(first.getId(), second.getId());
 
-        User updated = controller.update(validUser().id(first.getId()).email("new@mail.ru").build());
+        controller.update(validUser().id(first.getId()).email("new@mail.ru").build());
 
-        assertThat(updated.getFriends()).containsOnlyKeys(second.getId());
+        assertThat(controller.getFriends(first.getId())).containsExactly(second);
     }
 
     @Test
-    void addFriend_isMutual() {
+    void addFriend_isOneWay() {
         User first = controller.create(validUser().build());
         User second = controller.create(validUser().email("other@mail.ru").login("other").build());
 
         controller.addFriend(first.getId(), second.getId());
 
         assertThat(controller.getFriends(first.getId())).containsExactly(second);
-        assertThat(controller.getFriends(second.getId())).containsExactly(first);
+        assertThat(controller.getFriends(second.getId())).isEmpty();
     }
 
     @Test
@@ -134,6 +134,18 @@ class UserControllerTest {
         controller.addFriend(first.getId(), second.getId());
 
         assertThat(controller.getFriends(first.getId())).hasSize(1);
+    }
+
+    @Test
+    void addFriend_counterRequest_keepsBothLists() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(validUser().email("other@mail.ru").login("other").build());
+
+        controller.addFriend(first.getId(), second.getId());
+        controller.addFriend(second.getId(), first.getId());
+
+        assertThat(controller.getFriends(first.getId())).containsExactly(second);
+        assertThat(controller.getFriends(second.getId())).containsExactly(first);
     }
 
     @Test
@@ -153,15 +165,16 @@ class UserControllerTest {
     }
 
     @Test
-    void removeFriend_isMutual() {
+    void removeFriend_isOneWay() {
         User first = controller.create(validUser().build());
         User second = controller.create(validUser().email("other@mail.ru").login("other").build());
         controller.addFriend(first.getId(), second.getId());
+        controller.addFriend(second.getId(), first.getId());
 
         controller.removeFriend(first.getId(), second.getId());
 
         assertThat(controller.getFriends(first.getId())).isEmpty();
-        assertThat(controller.getFriends(second.getId())).isEmpty();
+        assertThat(controller.getFriends(second.getId())).containsExactly(first);
     }
 
     @Test
