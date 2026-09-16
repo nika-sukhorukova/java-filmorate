@@ -363,6 +363,53 @@ class DbStorageIntegrationTests {
         assertThat(mpaStorage.findById(9999)).isEmpty();
     }
 
+    @Test
+    void findRecommendations_returnsFilmsLikedByMostSimilarUser() {
+        User target = userStorage.create(validUser("target").build());
+        User similar = userStorage.create(validUser("similar").build());
+        User other = userStorage.create(validUser("other").build());
+
+        Film first = filmStorage.create(validFilm("Первый").build());
+        Film second = filmStorage.create(validFilm("Второй").build());
+        Film recommendation = filmStorage.create(validFilm("Рекомендация").build());
+        Film otherFilm = filmStorage.create(validFilm("Другой").build());
+
+        filmStorage.addLike(first.getId(), target.getId());
+        filmStorage.addLike(second.getId(), target.getId());
+
+        filmStorage.addLike(first.getId(), similar.getId());
+        filmStorage.addLike(second.getId(), similar.getId());
+        filmStorage.addLike(recommendation.getId(), similar.getId());
+
+        filmStorage.addLike(first.getId(), other.getId());
+        filmStorage.addLike(otherFilm.getId(), other.getId());
+
+        assertThat(filmStorage.findRecommendations(target.getId()))
+                .extracting(Film::getId)
+                .containsExactly(recommendation.getId());
+    }
+
+    @Test
+    void findRecommendations_withoutLikes_returnsEmptyCollection() {
+        User user = userStorage.create(validUser("target").build());
+
+        assertThat(filmStorage.findRecommendations(user.getId())).isEmpty();
+    }
+
+    @Test
+    void findRecommendations_withoutCommonLikes_returnsEmptyCollection() {
+        User target = userStorage.create(validUser("target").build());
+        User other = userStorage.create(validUser("other").build());
+
+        Film targetFilm = filmStorage.create(validFilm("Фильм target").build());
+        Film otherFilm = filmStorage.create(validFilm("Фильм другого").build());
+
+        filmStorage.addLike(targetFilm.getId(), target.getId());
+        filmStorage.addLike(otherFilm.getId(), other.getId());
+
+        assertThat(filmStorage.findRecommendations(target.getId())).isEmpty();
+    }
+
     private String statusOf(Long userId, Long friendId) {
         return jdbcTemplate.queryForObject(
                 "SELECT s.name FROM friendships AS f JOIN friendship_statuses AS s ON s.id = f.status_id"
