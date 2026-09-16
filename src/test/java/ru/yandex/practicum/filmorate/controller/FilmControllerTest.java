@@ -1,7 +1,12 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
@@ -9,31 +14,41 @@ import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
-import ru.yandex.practicum.filmorate.storage.InMemoryFilmGenreStorage;
-import ru.yandex.practicum.filmorate.storage.InMemoryGenreStorage;
-import ru.yandex.practicum.filmorate.storage.InMemoryMpaStorage;
-import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
+import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
+import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
+import ru.yandex.practicum.filmorate.storage.mpa.MpaDbStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Тесты контроллера через реальные DB-хранилища: каждый тест работает с резидентной базой,
+ * созданной по schema.sql и заполненной справочниками из data.sql, и откатывается после теста.
+ */
+@JdbcTest
+@AutoConfigureTestDatabase
+@Import({FilmDbStorage.class, UserDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
+        MpaDbStorage.class})
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 class FilmControllerTest {
+
+    private final FilmDbStorage filmStorage;
+    private final UserDbStorage userStorage;
+    private final GenreDbStorage genreStorage;
+    private final FilmGenreDbStorage filmGenreStorage;
+    private final MpaDbStorage mpaStorage;
 
     private FilmController controller;
     private UserController userController;
 
     @BeforeEach
     void setUp() {
-        InMemoryUserStorage userStorage = new InMemoryUserStorage();
-        controller = new FilmController(new FilmService(
-                new InMemoryFilmStorage(),
-                userStorage,
-                new InMemoryGenreStorage(),
-                new InMemoryFilmGenreStorage(),
-                new InMemoryMpaStorage()));
+        controller = new FilmController(
+                new FilmService(filmStorage, userStorage, genreStorage, filmGenreStorage, mpaStorage));
         userController = new UserController(new UserService(userStorage));
     }
 
