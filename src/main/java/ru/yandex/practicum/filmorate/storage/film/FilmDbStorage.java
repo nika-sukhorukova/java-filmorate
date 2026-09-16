@@ -15,10 +15,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 @Slf4j
 @Repository
@@ -105,6 +102,34 @@ public class FilmDbStorage implements FilmStorage {
                 + " ORDER BY COUNT(l.user_id) DESC, f.id"
                 + " LIMIT ?";
         return jdbcTemplate.query(sql, FILM_MAPPER, count);
+    }
+
+    @Override
+    public Collection<Film> findRecommendations(Long userId) {
+        String sql = SELECT_FILM + """
+            WHERE f.id IN (
+                SELECT fl.film_id
+                FROM film_likes AS fl
+                WHERE fl.user_id = (
+                    SELECT fl2.user_id
+                    FROM film_likes AS fl1
+                    JOIN film_likes AS fl2 ON fl1.film_id = fl2.film_id
+                    WHERE fl1.user_id = ?
+                      AND fl2.user_id <> fl1.user_id
+                    GROUP BY fl2.user_id
+                    ORDER BY COUNT(*) DESC, fl2.user_id
+                    LIMIT 1
+                )
+                AND fl.film_id NOT IN (
+                    SELECT film_id
+                    FROM film_likes
+                    WHERE user_id = ?
+                )
+            )
+            ORDER BY f.id
+            """;
+
+        return jdbcTemplate.query(sql, FILM_MAPPER, userId, userId);
     }
 
     private static Film mapFilm(ResultSet rs, int rowNum) throws SQLException {
