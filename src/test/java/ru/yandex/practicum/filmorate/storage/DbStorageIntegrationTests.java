@@ -374,15 +374,9 @@ class DbStorageIntegrationTests {
         Film recommendation = filmStorage.create(validFilm("Рекомендация").build());
         Film otherFilm = filmStorage.create(validFilm("Другой").build());
 
-        filmStorage.addLike(first.getId(), target.getId());
-        filmStorage.addLike(second.getId(), target.getId());
-
-        filmStorage.addLike(first.getId(), similar.getId());
-        filmStorage.addLike(second.getId(), similar.getId());
-        filmStorage.addLike(recommendation.getId(), similar.getId());
-
-        filmStorage.addLike(first.getId(), other.getId());
-        filmStorage.addLike(otherFilm.getId(), other.getId());
+        addLikes(target, first, second);
+        addLikes(similar, first, second, recommendation);
+        addLikes(other, first, otherFilm);
 
         assertThat(filmStorage.findRecommendations(target.getId()))
                 .extracting(Film::getId)
@@ -420,5 +414,11 @@ class DbStorageIntegrationTests {
     private Integer countLikes(Long filmId) {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM film_likes WHERE film_id = ?", Integer.class, filmId);
+    }
+
+    private void addLikes(User user, Film... films) {
+        for (Film film : films) {
+            filmStorage.addLike(film.getId(), user.getId());
+        }
     }
 }
