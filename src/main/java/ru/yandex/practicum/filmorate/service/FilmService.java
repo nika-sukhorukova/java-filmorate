@@ -210,4 +210,19 @@ public class FilmService {
 
         film.setDirectors(resolved);
     }
+
+    public Collection<Film> findByDirector(Long directorId, String sortBy) {
+        directorStorage.findById(directorId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Режиссёр с id=" + directorId + " не найден"));
+
+        Collection<Film> films = switch (sortBy) {
+            case "year"  -> filmStorage.findByDirectorSortedByYear(directorId);
+            case "likes" -> filmStorage.findByDirectorSortedByLikes(directorId);
+            default -> throw new ValidationException(
+                    "Параметр sortBy должен быть 'year' или 'likes', получено: " + sortBy);
+        };
+
+        return withDetails(films);
+    }
 }

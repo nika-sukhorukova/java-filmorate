@@ -69,4 +69,12 @@ public class FilmController {
         log.debug("DELETE /films/{}/like/{}", id, userId);
         filmService.removeLike(id, userId);
     }
+
+    @GetMapping("/director/{directorId}")
+    public Collection<Film> findByDirector(
+            @PathVariable Long directorId,
+            @RequestParam(defaultValue = "year") String sortBy) {
+        log.debug("GET /films/director/{}?sortBy={}", directorId, sortBy);
+        return filmService.findByDirector(directorId, sortBy);
+    }
 }
