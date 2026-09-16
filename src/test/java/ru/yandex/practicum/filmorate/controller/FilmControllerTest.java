@@ -9,30 +9,27 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.mpa.MpaDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
-
 import java.time.LocalDate;
-
+import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Тесты контроллера через реальные DB-хранилища: каждый тест работает с резидентной базой,
- * созданной по schema.sql и заполненной справочниками из data.sql, и откатывается после теста.
- */
 @JdbcTest
 @AutoConfigureTestDatabase
 @Import({FilmDbStorage.class, UserDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
-        MpaDbStorage.class})
+        MpaDbStorage.class, DirectorDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class FilmControllerTest {
 
@@ -41,6 +38,7 @@ class FilmControllerTest {
     private final GenreDbStorage genreStorage;
     private final FilmGenreDbStorage filmGenreStorage;
     private final MpaDbStorage mpaStorage;
+    private final DirectorDbStorage directorStorage;
 
     private FilmController controller;
     private UserController userController;
@@ -48,7 +46,7 @@ class FilmControllerTest {
     @BeforeEach
     void setUp() {
         controller = new FilmController(
-                new FilmService(filmStorage, userStorage, genreStorage, filmGenreStorage, mpaStorage));
+                new FilmService(filmStorage, userStorage, genreStorage, filmGenreStorage, mpaStorage, directorStorage));
         userController = new UserController(new UserService(userStorage));
     }
 
@@ -68,6 +66,10 @@ class FilmControllerTest {
                 .name("Имя")
                 .birthday(LocalDate.of(1990, 1, 1))
                 .build());
+    }
+
+    private Director createDirector(String name) {
+        return directorStorage.create(Director.builder().name(name).build());
     }
 
     @Test
@@ -205,5 +207,81 @@ class FilmControllerTest {
     void getPopular_nonPositiveCount_throwsValidationException() {
         assertThatThrownBy(() -> controller.getPopular(0))
                 .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void create_withDirectors_savesAndReturnsThem() {
+        Director nolan = createDirector("Нолан");
+
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findById(created.getId()).getDirectors())
+                .extracting(Director::getId)
+                .containsExactly(nolan.getId());
+    }
+
+    @Test
+    void create_withUnknownDirector_throwsNotFoundException() {
+        Film film = validFilm()
+                .directors(Set.of(Director.builder().id(999L).build()))
+                .build();
+
+        assertThatThrownBy(() -> controller.create(film))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void create_deduplicatesDirectors() {
+        Director nolan = createDirector("Нолан");
+        Director duplicate = Director.builder().id(nolan.getId()).name("Другое имя").build();
+
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build(), duplicate))
+                .build());
+
+        assertThat(controller.findById(created.getId()).getDirectors()).hasSize(1);
+    }
+
+    @Test
+    void update_replacesDirectors() {
+        Director nolan = createDirector("Нолан");
+        Director tarantino = createDirector("Тарантино");
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        controller.update(validFilm()
+                .id(created.getId())
+                .directors(Set.of(Director.builder().id(tarantino.getId()).build()))
+                .build());
+
+        assertThat(controller.findById(created.getId()).getDirectors())
+                .extracting(Director::getId)
+                .containsExactly(tarantino.getId());
+    }
+
+    @Test
+    void update_withEmptyDirectors_clearsThem() {
+        Director nolan = createDirector("Нолан");
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        controller.update(validFilm().id(created.getId()).build());
+
+        assertThat(controller.findById(created.getId()).getDirectors()).isEmpty();
+    }
+
+    @Test
+    void findAll_returnsFilmsWithDirectors() {
+        Director nolan = createDirector("Нолан");
+        controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findAll())
+                .allSatisfy(f -> assertThat(f.getDirectors()).isNotEmpty());
     }
 }

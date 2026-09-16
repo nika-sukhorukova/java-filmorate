@@ -119,6 +119,7 @@ public class FilmDbStorage implements FilmStorage {
                         .name(rs.getString("mpa_name"))
                         .build())
                 .genres(new LinkedHashSet<>())
+                .directors(new LinkedHashSet<>())
                 .build();
     }
 }

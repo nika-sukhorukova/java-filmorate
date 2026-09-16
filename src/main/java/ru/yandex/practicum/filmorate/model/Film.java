@@ -46,4 +46,7 @@ public class Film {
      */
     @NotNull(message = "Возрастной рейтинг MPA должен быть указан")
     private Mpa mpa;
+
+    @Builder.Default
+    private Set<Director> directors = new LinkedHashSet<>();
 }
