@@ -1,5 +1,8 @@
 package ru.yandex.practicum.filmorate.model;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -9,6 +12,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -137,5 +143,28 @@ class FilmValidationTest {
         Film film = validFilm().mpa(Mpa.builder().id(3).name("PG-13").build()).build();
 
         assertThat(hasViolationOn(validator.validate(film), "mpa")).isFalse();
+    }
+
+    @Test
+    void deserialization_singularDirectorKey_isMappedToDirectors() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("name", "Интерстеллар");
+        payload.put("description", "Фильм про космос");
+        payload.put("releaseDate", "2014-11-06");
+        payload.put("duration", 169);
+        payload.put("mpa", Map.of("id", 1));
+        payload.put("director", List.of(Map.of("id", 42)));
+
+        String json = mapper.writeValueAsString(payload);
+
+        Film film = mapper.readValue(json, Film.class);
+
+        assertThat(film.getDirectors())
+                .extracting(Director::getId)
+                .containsExactly(42L);
     }
 }
