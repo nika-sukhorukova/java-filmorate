@@ -15,7 +15,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Optional;
 
 @Slf4j
 @Repository
@@ -110,15 +113,24 @@ public class FilmDbStorage implements FilmStorage {
             WHERE f.id IN (
                 SELECT fl.film_id
                 FROM film_likes AS fl
-                WHERE fl.user_id = (
+                WHERE fl.user_id IN (
                     SELECT fl2.user_id
                     FROM film_likes AS fl1
                     JOIN film_likes AS fl2 ON fl1.film_id = fl2.film_id
                     WHERE fl1.user_id = ?
                       AND fl2.user_id <> fl1.user_id
                     GROUP BY fl2.user_id
-                    ORDER BY COUNT(*) DESC, fl2.user_id
-                    LIMIT 1
+                    HAVING COUNT(*) = (
+                        SELECT MAX(common_likes)
+                        FROM (
+                            SELECT COUNT(*) AS common_likes
+                            FROM film_likes AS fl3
+                            JOIN film_likes AS fl4 ON fl3.film_id = fl4.film_id
+                            WHERE fl3.user_id = ?
+                              AND fl4.user_id <> fl3.user_id
+                            GROUP BY fl4.user_id
+                        ) AS similarities
+                    )
                 )
                 AND fl.film_id NOT IN (
                     SELECT film_id
@@ -129,7 +141,7 @@ public class FilmDbStorage implements FilmStorage {
             ORDER BY f.id
             """;
 
-        return jdbcTemplate.query(sql, FILM_MAPPER, userId, userId);
+        return jdbcTemplate.query(sql, FILM_MAPPER, userId, userId, userId);
     }
 
     private static Film mapFilm(ResultSet rs, int rowNum) throws SQLException {

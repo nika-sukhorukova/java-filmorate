@@ -384,6 +384,25 @@ class DbStorageIntegrationTests {
     }
 
     @Test
+    void findRecommendations_equalSimilarity_returnsFilmsFromAllSimilarUsers() {
+        User target = userStorage.create(validUser("target").build());
+        User firstSimilar = userStorage.create(validUser("firstSimilar").build());
+        User secondSimilar = userStorage.create(validUser("secondSimilar").build());
+
+        Film common = filmStorage.create(validFilm("Общий").build());
+        Film firstRecommendation = filmStorage.create(validFilm("Первая рекомендация").build());
+        Film secondRecommendation = filmStorage.create(validFilm("Вторая рекомендация").build());
+
+        addLikes(target, common);
+        addLikes(firstSimilar, common, firstRecommendation);
+        addLikes(secondSimilar, common, secondRecommendation);
+
+        assertThat(filmStorage.findRecommendations(target.getId()))
+                .extracting(Film::getId)
+                .containsExactly(firstRecommendation.getId(), secondRecommendation.getId());
+    }
+
+    @Test
     void findRecommendations_withoutLikes_returnsEmptyCollection() {
         User user = userStorage.create(validUser("target").build());
 
