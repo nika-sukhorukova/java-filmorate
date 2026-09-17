@@ -27,4 +27,9 @@ public interface FilmStorage {
     Collection<Film> findByDirectorSortedByYear(Long directorId);
 
     Collection<Film> findByDirectorSortedByLikes(Long directorId);
+    /**
+     * Возвращает фильмы, рекомендованные пользователю на основе общих лайков
+     * с другими пользователями.
+     */
+    Collection<Film> findRecommendations(Long userId);
 }

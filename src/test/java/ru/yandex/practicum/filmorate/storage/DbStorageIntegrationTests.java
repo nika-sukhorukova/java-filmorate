@@ -485,6 +485,63 @@ class DbStorageIntegrationTests {
         directorStorage.delete(d.getId());
 
         assertThat(directorStorage.findByFilmId(film.getId())).isEmpty();
+    void findRecommendations_returnsFilmsLikedByMostSimilarUser() {
+        User target = userStorage.create(validUser("target").build());
+        User similar = userStorage.create(validUser("similar").build());
+        User other = userStorage.create(validUser("other").build());
+
+        Film first = filmStorage.create(validFilm("Первый").build());
+        Film second = filmStorage.create(validFilm("Второй").build());
+        Film recommendation = filmStorage.create(validFilm("Рекомендация").build());
+        Film otherFilm = filmStorage.create(validFilm("Другой").build());
+
+        addLikes(target, first, second);
+        addLikes(similar, first, second, recommendation);
+        addLikes(other, first, otherFilm);
+
+        assertThat(filmStorage.findRecommendations(target.getId()))
+                .extracting(Film::getId)
+                .containsExactly(recommendation.getId());
+    }
+
+    @Test
+    void findRecommendations_equalSimilarity_returnsFilmsFromAllSimilarUsers() {
+        User target = userStorage.create(validUser("target").build());
+        User firstSimilar = userStorage.create(validUser("firstSimilar").build());
+        User secondSimilar = userStorage.create(validUser("secondSimilar").build());
+
+        Film common = filmStorage.create(validFilm("Общий").build());
+        Film firstRecommendation = filmStorage.create(validFilm("Первая рекомендация").build());
+        Film secondRecommendation = filmStorage.create(validFilm("Вторая рекомендация").build());
+
+        addLikes(target, common);
+        addLikes(firstSimilar, common, firstRecommendation);
+        addLikes(secondSimilar, common, secondRecommendation);
+
+        assertThat(filmStorage.findRecommendations(target.getId()))
+                .extracting(Film::getId)
+                .containsExactly(firstRecommendation.getId(), secondRecommendation.getId());
+    }
+
+    @Test
+    void findRecommendations_withoutLikes_returnsEmptyCollection() {
+        User user = userStorage.create(validUser("target").build());
+
+        assertThat(filmStorage.findRecommendations(user.getId())).isEmpty();
+    }
+
+    @Test
+    void findRecommendations_withoutCommonLikes_returnsEmptyCollection() {
+        User target = userStorage.create(validUser("target").build());
+        User other = userStorage.create(validUser("other").build());
+
+        Film targetFilm = filmStorage.create(validFilm("Фильм target").build());
+        Film otherFilm = filmStorage.create(validFilm("Фильм другого").build());
+
+        filmStorage.addLike(targetFilm.getId(), target.getId());
+        filmStorage.addLike(otherFilm.getId(), other.getId());
+
+        assertThat(filmStorage.findRecommendations(target.getId())).isEmpty();
     }
 
     private String statusOf(Long userId, Long friendId) {
@@ -497,5 +554,12 @@ class DbStorageIntegrationTests {
     private Integer countLikes(Long filmId) {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM film_likes WHERE film_id = ?", Integer.class, filmId);
+    }
+}
+
+    private void addLikes(User user, Film... films) {
+        for (Film film : films) {
+            filmStorage.addLike(film.getId(), user.getId());
+        }
     }
 }
