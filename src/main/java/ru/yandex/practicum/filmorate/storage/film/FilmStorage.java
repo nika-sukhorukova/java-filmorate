@@ -23,8 +23,4 @@ public interface FilmStorage {
      * Возвращает фильмы, отсортированные по числу лайков по убыванию.
      */
     Collection<Film> findPopular(int count);
-
-    Collection<Film> findByDirectorSortedByYear(Long directorId);
-
-    Collection<Film> findByDirectorSortedByLikes(Long directorId);
 }

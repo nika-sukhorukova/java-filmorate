@@ -1,10 +1,5 @@
 package ru.yandex.practicum.filmorate.storage;
 
-/**
- * Интеграционные тесты DAO: каждый тест работает с резидентной базой, созданной по schema.sql
- * и заполненной справочниками из data.sql.
- */
-
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,12 +7,10 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
@@ -33,10 +26,14 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Интеграционные тесты DAO: каждый тест работает с резидентной базой, созданной по schema.sql
+ * и заполненной справочниками из data.sql.
+ */
 @JdbcTest
 @AutoConfigureTestDatabase
 @Import({UserDbStorage.class, FilmDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
-        MpaDbStorage.class, DirectorDbStorage.class})
+        MpaDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class DbStorageIntegrationTests {
 
@@ -45,7 +42,6 @@ class DbStorageIntegrationTests {
     private final GenreDbStorage genreStorage;
     private final FilmGenreDbStorage filmGenreStorage;
     private final MpaDbStorage mpaStorage;
-    private final DirectorDbStorage directorStorage;
     private final JdbcTemplate jdbcTemplate;
 
     private User.UserBuilder validUser(String login) {
@@ -63,10 +59,6 @@ class DbStorageIntegrationTests {
                 .releaseDate(LocalDate.of(2014, 11, 6))
                 .duration(169)
                 .mpa(Mpa.builder().id(1).name("G").build());
-    }
-
-    private Director.DirectorBuilder validDirector(String name) {
-        return Director.builder().name(name);
     }
 
     @Test
@@ -369,122 +361,6 @@ class DbStorageIntegrationTests {
     @Test
     void findMpaById_unknownId_isEmpty() {
         assertThat(mpaStorage.findById(9999)).isEmpty();
-    }
-
-    @Test
-    void createDirector_assignsIdAndCanBeFound() {
-        Director created = directorStorage.create(validDirector("Нолан").build());
-
-        assertThat(directorStorage.findById(created.getId()))
-                .isPresent()
-                .hasValueSatisfying(d -> assertThat(d.getName()).isEqualTo("Нолан"));
-    }
-
-    @Test
-    void findDirectorById_unknownId_isEmpty() {
-        assertThat(directorStorage.findById(9999L)).isEmpty();
-    }
-
-    @Test
-    void findAllDirectors_orderedById() {
-        directorStorage.create(validDirector("Нолан").build());
-        directorStorage.create(validDirector("Тарантино").build());
-
-        assertThat(directorStorage.findAll())
-                .extracting(Director::getName)
-                .containsExactly("Нолан", "Тарантино");
-    }
-
-    @Test
-    void updateDirector_changesName() {
-        Director created = directorStorage.create(validDirector("Нолан").build());
-        created.setName("Кристофер Нолан");
-
-        directorStorage.update(created);
-
-        assertThat(directorStorage.findById(created.getId()))
-                .get()
-                .hasFieldOrPropertyWithValue("name", "Кристофер Нолан");
-    }
-
-    @Test
-    void deleteDirector_removesIt() {
-        Director created = directorStorage.create(validDirector("Нолан").build());
-
-        directorStorage.delete(created.getId());
-
-        assertThat(directorStorage.findById(created.getId())).isEmpty();
-    }
-
-    @Test
-    void findAllDirectorsByIds_returnsOnlyRequested() {
-        Director first = directorStorage.create(validDirector("Нолан").build());
-        directorStorage.create(validDirector("Тарантино").build());
-
-        assertThat(directorStorage.findAllByIds(Set.of(first.getId())))
-                .extracting(Director::getName)
-                .containsExactly("Нолан");
-    }
-
-    @Test
-    void findAllDirectorsByIds_emptySet_returnsEmpty() {
-        assertThat(directorStorage.findAllByIds(Set.of())).isEmpty();
-    }
-
-    @Test
-    void saveFilmDirectors_storesLinks() {
-        Film film = filmStorage.create(validFilm("С режиссёрами").build());
-        Director d1 = directorStorage.create(validDirector("Нолан").build());
-        Director d2 = directorStorage.create(validDirector("Тарантино").build());
-
-        directorStorage.saveFilmDirectors(film.getId(), List.of(d1, d2));
-
-        assertThat(directorStorage.findByFilmId(film.getId()))
-                .extracting(Director::getId)
-                .containsExactlyInAnyOrder(d1.getId(), d2.getId());
-    }
-
-    @Test
-    void findDirectorsByFilmIds_groupsByFilm() {
-        Film first = filmStorage.create(validFilm("Первый").build());
-        Film second = filmStorage.create(validFilm("Второй").build());
-        Director d1 = directorStorage.create(validDirector("Нолан").build());
-        Director d2 = directorStorage.create(validDirector("Тарантино").build());
-        directorStorage.saveFilmDirectors(first.getId(), List.of(d1));
-        directorStorage.saveFilmDirectors(second.getId(), List.of(d2));
-
-        Map<Long, Set<Director>> map =
-                directorStorage.findByFilmIds(List.of(first.getId(), second.getId()));
-
-        assertThat(map.get(first.getId())).extracting(Director::getId).containsExactly(d1.getId());
-        assertThat(map.get(second.getId())).extracting(Director::getId).containsExactly(d2.getId());
-    }
-
-    @Test
-    void findDirectorsByFilmIds_emptyInput_returnsEmptyMap() {
-        assertThat(directorStorage.findByFilmIds(List.of())).isEmpty();
-    }
-
-    @Test
-    void deleteFilmDirectors_dropsAllLinks() {
-        Film film = filmStorage.create(validFilm("Фильм").build());
-        Director d = directorStorage.create(validDirector("Нолан").build());
-        directorStorage.saveFilmDirectors(film.getId(), List.of(d));
-
-        directorStorage.deleteFilmDirectors(film.getId());
-
-        assertThat(directorStorage.findByFilmId(film.getId())).isEmpty();
-    }
-
-    @Test
-    void deleteDirector_cascadesFilmLinks() {
-        Film film = filmStorage.create(validFilm("Фильм").build());
-        Director d = directorStorage.create(validDirector("Нолан").build());
-        directorStorage.saveFilmDirectors(film.getId(), List.of(d));
-
-        directorStorage.delete(d.getId());
-
-        assertThat(directorStorage.findByFilmId(film.getId())).isEmpty();
     }
 
     private String statusOf(Long userId, Long friendId) {
