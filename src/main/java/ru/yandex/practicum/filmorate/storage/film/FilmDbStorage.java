@@ -184,9 +184,11 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public Collection<Film> findCommonFilms(Long userId, Long friendId) {
         String sql = SELECT_FILM
-                + " WHERE EXISTS (SELECT 1 FROM film_likes WHERE film_id = f.id AND user_id = ?)"
-                + " AND EXISTS (SELECT 1 FROM film_likes WHERE film_id = f.id AND user_id = ?)"
-                + " ORDER BY (SELECT COUNT(*) FROM film_likes WHERE film_id = f.id) DESC, f.id";
+                + " WHERE EXISTS (SELECT 1 FROM film_likes AS fl1"
+                + "               WHERE fl1.film_id = f.id AND fl1.user_id = ?)"
+                + "   AND EXISTS (SELECT 1 FROM film_likes AS fl2"
+                + "               WHERE fl2.film_id = f.id AND fl2.user_id = ?)"
+                + " ORDER BY (SELECT COUNT(*) FROM film_likes AS fl3 WHERE fl3.film_id = f.id) DESC, f.id";
         return jdbcTemplate.query(sql, FILM_MAPPER, userId, friendId);
     }
 }

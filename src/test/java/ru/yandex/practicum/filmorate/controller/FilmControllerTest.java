@@ -9,10 +9,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
-import ru.yandex.practicum.filmorate.model.Director;
-import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Mpa;
-import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.*;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
@@ -443,7 +440,7 @@ class FilmControllerTest {
     }
 
     @Test
-    void findCommonFilms_unknownUser_throwsNotFoundException() {
+    void findCommonFilms_unknownFriend_throwsNotFoundException() {
         User user = createUser("first");
 
         assertThatThrownBy(() -> controller.findCommonFilms(user.getId(), 999L))
@@ -451,7 +448,7 @@ class FilmControllerTest {
     }
 
     @Test
-    void findCommonFilms_unknownFriend_throwsNotFoundException() {
+    void findCommonFilms_unknownUser_throwsNotFoundException() {
         User user = createUser("first");
 
         assertThatThrownBy(() -> controller.findCommonFilms(999L, user.getId()))
@@ -463,6 +460,7 @@ class FilmControllerTest {
         Director nolan = createDirector("Нолан");
         Film common = controller.create(validFilm()
                 .name("Общий")
+                .genres(Set.of(Genre.builder().id(1).build()))
                 .directors(Set.of(Director.builder().id(nolan.getId()).build()))
                 .build());
         User first = createUser("first");
@@ -471,6 +469,10 @@ class FilmControllerTest {
         controller.addLike(common.getId(), second.getId());
 
         assertThat(controller.findCommonFilms(first.getId(), second.getId()))
-                .allSatisfy(f -> assertThat(f.getDirectors()).isNotEmpty());
+                .singleElement()
+                .satisfies(f -> {
+                    assertThat(f.getDirectors()).isNotEmpty();
+                    assertThat(f.getGenres()).isNotEmpty();
+                });
     }
 }
