@@ -107,6 +107,43 @@ public class FilmDbStorage implements FilmStorage {
         return jdbcTemplate.query(sql, FILM_MAPPER, count);
     }
 
+    @Override
+    public Collection<Film> findRecommendations(Long userId) {
+        String sql = SELECT_FILM + """
+            WHERE f.id IN (
+                SELECT fl.film_id
+                FROM film_likes AS fl
+                WHERE fl.user_id IN (
+                    SELECT fl2.user_id
+                    FROM film_likes AS fl1
+                    JOIN film_likes AS fl2 ON fl1.film_id = fl2.film_id
+                    WHERE fl1.user_id = ?
+                      AND fl2.user_id <> fl1.user_id
+                    GROUP BY fl2.user_id
+                    HAVING COUNT(*) = (
+                        SELECT MAX(common_likes)
+                        FROM (
+                            SELECT COUNT(*) AS common_likes
+                            FROM film_likes AS fl3
+                            JOIN film_likes AS fl4 ON fl3.film_id = fl4.film_id
+                            WHERE fl3.user_id = ?
+                              AND fl4.user_id <> fl3.user_id
+                            GROUP BY fl4.user_id
+                        ) AS similarities
+                    )
+                )
+                AND fl.film_id NOT IN (
+                    SELECT film_id
+                    FROM film_likes
+                    WHERE user_id = ?
+                )
+            )
+            ORDER BY f.id
+            """;
+
+        return jdbcTemplate.query(sql, FILM_MAPPER, userId, userId, userId);
+    }
+
     private static Film mapFilm(ResultSet rs, int rowNum) throws SQLException {
         return Film.builder()
                 .id(rs.getLong("id"))
