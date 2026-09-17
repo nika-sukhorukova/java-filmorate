@@ -149,14 +149,12 @@ class FilmValidationTest {
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         String json = """
-            {
-              "name": "Интерстеллар",
+              {"name": "Интерстеллар",
               "description": "Фильм про космос",
               "releaseDate": "2014-11-06",
               "duration": 169,
               "mpa": {"id": 1},
-              "director": [{"id": 42}]
-            }
+              "director": [{"id": 42}]}
             """;
 
         Film film = mapper.readValue(json, Film.class);
