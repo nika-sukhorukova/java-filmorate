@@ -1,30 +1,42 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.RecommendationService;
-import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
+import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
+import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
+import ru.yandex.practicum.filmorate.storage.mpa.MpaDbStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@JdbcTest
+@AutoConfigureTestDatabase
+@Import({FilmDbStorage.class, UserDbStorage.class, GenreDbStorage.class,
+        FilmGenreDbStorage.class, MpaDbStorage.class})
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 class RecommendationControllerTest {
 
+    private final FilmDbStorage filmStorage;
+    private final UserDbStorage userStorage;
+
     private RecommendationController controller;
-    private InMemoryUserStorage userStorage;
-    private InMemoryFilmStorage filmStorage;
 
     @BeforeEach
     void setUp() {
-        userStorage = new InMemoryUserStorage();
-        filmStorage = new InMemoryFilmStorage();
-
         controller = new RecommendationController(
                 new RecommendationService(userStorage, filmStorage)
         );
@@ -67,6 +79,7 @@ class RecommendationControllerTest {
                 .name(name)
                 .description("Описание " + name)
                 .releaseDate(LocalDate.of(2014, 11, 6))
-                .duration(169);
+                .duration(169)
+                .mpa(Mpa.builder().id(1).build());
     }
 }
