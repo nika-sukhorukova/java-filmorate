@@ -10,11 +10,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.model.Review;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.mpa.MpaDbStorage;
+import ru.yandex.practicum.filmorate.storage.review.ReviewDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
@@ -33,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @JdbcTest
 @AutoConfigureTestDatabase
 @Import({UserDbStorage.class, FilmDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
-        MpaDbStorage.class})
+        MpaDbStorage.class, ReviewDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class DbStorageIntegrationTests {
 
@@ -42,6 +44,7 @@ class DbStorageIntegrationTests {
     private final GenreDbStorage genreStorage;
     private final FilmGenreDbStorage filmGenreStorage;
     private final MpaDbStorage mpaStorage;
+    private final ReviewDbStorage reviewStorage;
     private final JdbcTemplate jdbcTemplate;
 
     private User.UserBuilder validUser(String login) {
@@ -50,6 +53,14 @@ class DbStorageIntegrationTests {
                 .login(login)
                 .name("Имя " + login)
                 .birthday(LocalDate.of(1990, 1, 1));
+    }
+
+    private Review.ReviewBuilder validReview(Long userId, Long filmId) {
+        return Review.builder()
+                .content("Отличный фильм")
+                .isPositive(true)
+                .userId(userId)
+                .filmId(filmId);
     }
 
     private Film.FilmBuilder validFilm(String name) {
@@ -361,6 +372,166 @@ class DbStorageIntegrationTests {
     @Test
     void findMpaById_unknownId_isEmpty() {
         assertThat(mpaStorage.findById(9999)).isEmpty();
+    }
+
+    @Test
+    void createReview_assignsIdAndZeroUseful() {
+        User author = userStorage.create(validUser("author").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        assertThat(created.getReviewId()).isNotNull();
+        assertThat(created.getUseful()).isZero();
+        assertThat(reviewStorage.findById(created.getReviewId()))
+                .get()
+                .usingRecursiveComparison()
+                .isEqualTo(created);
+    }
+
+    @Test
+    void findReviewById_unknownId_isEmpty() {
+        assertThat(reviewStorage.findById(9999L)).isEmpty();
+    }
+
+    @Test
+    void updateReview_changesContentAndType() {
+        User author = userStorage.create(validUser("author").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        created.setContent("Пересмотрел — плохо");
+        created.setIsPositive(false);
+        reviewStorage.update(created);
+
+        assertThat(reviewStorage.findById(created.getReviewId()))
+                .get()
+                .usingRecursiveComparison()
+                .isEqualTo(created);
+    }
+
+    @Test
+    void deleteReview_removesIt() {
+        User author = userStorage.create(validUser("author").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        reviewStorage.delete(created.getReviewId());
+
+        assertThat(reviewStorage.findById(created.getReviewId())).isEmpty();
+    }
+
+    @Test
+    void addLike_increasesUseful() {
+        User author = userStorage.create(validUser("author").build());
+        User liker = userStorage.create(validUser("liker").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        reviewStorage.addLike(created.getReviewId(), liker.getId());
+
+        assertThat(reviewStorage.findById(created.getReviewId())).get().hasFieldOrPropertyWithValue("useful", 1);
+    }
+
+    @Test
+    void addDislike_decreasesUseful() {
+        User author = userStorage.create(validUser("author").build());
+        User disliker = userStorage.create(validUser("disliker").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        reviewStorage.addDislike(created.getReviewId(), disliker.getId());
+
+        assertThat(reviewStorage.findById(created.getReviewId())).get().hasFieldOrPropertyWithValue("useful", -1);
+    }
+
+    @Test
+    void addLike_isIdempotentPerUser() {
+        User author = userStorage.create(validUser("author").build());
+        User liker = userStorage.create(validUser("liker").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        reviewStorage.addLike(created.getReviewId(), liker.getId());
+        reviewStorage.addLike(created.getReviewId(), liker.getId());
+
+        assertThat(reviewStorage.findById(created.getReviewId())).get().hasFieldOrPropertyWithValue("useful", 1);
+    }
+
+    @Test
+    void addDislike_afterLike_flipsVote() {
+        User author = userStorage.create(validUser("author").build());
+        User voter = userStorage.create(validUser("voter").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        reviewStorage.addLike(created.getReviewId(), voter.getId());
+        reviewStorage.addDislike(created.getReviewId(), voter.getId());
+
+        assertThat(reviewStorage.findById(created.getReviewId())).get().hasFieldOrPropertyWithValue("useful", -1);
+    }
+
+    @Test
+    void removeLike_dropsVote() {
+        User author = userStorage.create(validUser("author").build());
+        User liker = userStorage.create(validUser("liker").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+        reviewStorage.addLike(created.getReviewId(), liker.getId());
+
+        reviewStorage.removeLike(created.getReviewId(), liker.getId());
+
+        assertThat(reviewStorage.findById(created.getReviewId())).get().hasFieldOrPropertyWithValue("useful", 0);
+    }
+
+    @Test
+    void removeDislike_doesNotDropLike() {
+        User author = userStorage.create(validUser("author").build());
+        User liker = userStorage.create(validUser("liker").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Review created = reviewStorage.create(validReview(author.getId(), film.getId()).build());
+        reviewStorage.addLike(created.getReviewId(), liker.getId());
+
+        reviewStorage.removeDislike(created.getReviewId(), liker.getId());
+
+        assertThat(reviewStorage.findById(created.getReviewId())).get().hasFieldOrPropertyWithValue("useful", 1);
+    }
+
+    @Test
+    void findReviewsByFilmId_returnsOnlyThatFilmsReviewsSortedByUseful() {
+        User author = userStorage.create(validUser("author").build());
+        User voter = userStorage.create(validUser("voter").build());
+        Film first = filmStorage.create(validFilm("Первый").build());
+        Film second = filmStorage.create(validFilm("Второй").build());
+        Review lowRated = reviewStorage.create(validReview(author.getId(), first.getId()).build());
+        Review highRated = reviewStorage.create(validReview(author.getId(), first.getId()).build());
+        reviewStorage.create(validReview(author.getId(), second.getId()).build());
+        reviewStorage.addLike(highRated.getReviewId(), voter.getId());
+
+        assertThat(reviewStorage.findByFilmId(first.getId(), 10))
+                .extracting(Review::getReviewId)
+                .containsExactly(highRated.getReviewId(), lowRated.getReviewId());
+    }
+
+    @Test
+    void findReviewsByFilmId_nullFilmId_returnsAllReviews() {
+        User author = userStorage.create(validUser("author").build());
+        Film first = filmStorage.create(validFilm("Первый").build());
+        Film second = filmStorage.create(validFilm("Второй").build());
+        reviewStorage.create(validReview(author.getId(), first.getId()).build());
+        reviewStorage.create(validReview(author.getId(), second.getId()).build());
+
+        assertThat(reviewStorage.findByFilmId(null, 10)).hasSize(2);
+    }
+
+    @Test
+    void findReviewsByFilmId_respectsCount() {
+        User author = userStorage.create(validUser("author").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        reviewStorage.create(validReview(author.getId(), film.getId()).build());
+        reviewStorage.create(validReview(author.getId(), film.getId()).build());
+
+        assertThat(reviewStorage.findByFilmId(film.getId(), 1)).hasSize(1);
     }
 
     private String statusOf(Long userId, Long friendId) {
