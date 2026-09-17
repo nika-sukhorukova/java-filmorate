@@ -180,4 +180,13 @@ public class FilmDbStorage implements FilmStorage {
                 .directors(new LinkedHashSet<>())
                 .build();
     }
+
+    @Override
+    public Collection<Film> findCommonFilms(Long userId, Long friendId) {
+        String sql = SELECT_FILM
+                + " WHERE EXISTS (SELECT 1 FROM film_likes WHERE film_id = f.id AND user_id = ?)"
+                + " AND EXISTS (SELECT 1 FROM film_likes WHERE film_id = f.id AND user_id = ?)"
+                + " ORDER BY (SELECT COUNT(*) FROM film_likes WHERE film_id = f.id) DESC, f.id";
+        return jdbcTemplate.query(sql, FILM_MAPPER, userId, friendId);
+    }
 }
