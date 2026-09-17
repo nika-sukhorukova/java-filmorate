@@ -284,4 +284,91 @@ class FilmControllerTest {
         assertThat(controller.findAll())
                 .allSatisfy(f -> assertThat(f.getDirectors()).isNotEmpty());
     }
+
+    @Test
+    void findByDirector_unknownDirector_throwsNotFoundException() {
+        assertThatThrownBy(() -> controller.findByDirector(999L, "year"))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void findByDirector_invalidSortBy_throwsValidationException() {
+        Director nolan = createDirector("Нолан");
+        controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThatThrownBy(() -> controller.findByDirector(nolan.getId(), "name"))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void findByDirector_sortByYear_ordersByReleaseDate() {
+        Director nolan = createDirector("Нолан");
+        Film older = controller.create(validFilm()
+                .name("Старый")
+                .releaseDate(LocalDate.of(2000, 1, 1))
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        Film newer = controller.create(validFilm()
+                .name("Новый")
+                .releaseDate(LocalDate.of(2020, 1, 1))
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findByDirector(nolan.getId(), "year"))
+                .extracting(Film::getId)
+                .containsExactly(older.getId(), newer.getId());
+    }
+
+    @Test
+    void findByDirector_sortByLikes_ordersByLikesDescending() {
+        Director nolan = createDirector("Нолан");
+        Film unpopular = controller.create(validFilm()
+                .name("Без лайков")
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        Film popular = controller.create(validFilm()
+                .name("С лайками")
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        User first = createUser("first");
+        User second = createUser("second");
+        controller.addLike(popular.getId(), first.getId());
+        controller.addLike(popular.getId(), second.getId());
+        controller.addLike(unpopular.getId(), first.getId());
+
+        assertThat(controller.findByDirector(nolan.getId(), "likes"))
+                .extracting(Film::getId)
+                .containsExactly(popular.getId(), unpopular.getId());
+    }
+
+    @Test
+    void findByDirector_returnsOnlyFilmsOfThatDirector() {
+        Director nolan = createDirector("Нолан");
+        Director tarantino = createDirector("Тарантино");
+        Film nolanFilm = controller.create(validFilm()
+                .name("Нолановский")
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        controller.create(validFilm()
+                .name("Тарантиновский")
+                .directors(Set.of(Director.builder().id(tarantino.getId()).build()))
+                .build());
+
+        assertThat(controller.findByDirector(nolan.getId(), "year"))
+                .extracting(Film::getId)
+                .containsExactly(nolanFilm.getId());
+    }
+
+    @Test
+    void findByDirector_returnsFilmsWithDirectorsAndGenres() {
+        Director nolan = createDirector("Нолан");
+        controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findByDirector(nolan.getId(), "year"))
+                .allSatisfy(f -> assertThat(f.getDirectors()).isNotEmpty());
+    }
 }
