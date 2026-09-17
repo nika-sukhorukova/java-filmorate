@@ -108,6 +108,27 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     @Override
+    public Collection<Film> findByDirectorSortedByYear(Long directorId) {
+        String sql = SELECT_FILM
+                + " JOIN film_directors AS fd ON fd.film_id = f.id"
+                + " WHERE fd.director_id = ?"
+                + " ORDER BY f.release_date";
+        return jdbcTemplate.query(sql, FILM_MAPPER, directorId);
+    }
+
+    @Override
+    public Collection<Film> findByDirectorSortedByLikes(Long directorId) {
+        String sql = SELECT_FILM
+                + " JOIN film_directors AS fd ON fd.film_id = f.id"
+                + " LEFT JOIN film_likes AS l ON l.film_id = f.id"
+                + " WHERE fd.director_id = ?"
+                + " GROUP BY f.id, f.name, f.description, f.release_date,"
+                + "          f.duration, f.mpa_rating_id, m.name"
+                + " ORDER BY COUNT(l.user_id) DESC, f.id";
+        return jdbcTemplate.query(sql, FILM_MAPPER, directorId);
+    }
+
+    @Override
     public Collection<Film> findRecommendations(Long userId) {
         String sql = SELECT_FILM + """
             WHERE f.id IN (
@@ -156,6 +177,7 @@ public class FilmDbStorage implements FilmStorage {
                         .name(rs.getString("mpa_name"))
                         .build())
                 .genres(new LinkedHashSet<>())
+                .directors(new LinkedHashSet<>())
                 .build();
     }
 }
