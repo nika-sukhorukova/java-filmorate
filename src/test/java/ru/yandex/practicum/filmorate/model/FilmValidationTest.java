@@ -12,6 +12,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -148,14 +151,15 @@ class FilmValidationTest {
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        String json = """
-              {"name": "Интерстеллар",
-              "description": "Фильм про космос",
-              "releaseDate": "2014-11-06",
-              "duration": 169,
-              "mpa": {"id": 1},
-              "director": [{"id": 42}]}
-            """;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("name", "Интерстеллар");
+        payload.put("description", "Фильм про космос");
+        payload.put("releaseDate", "2014-11-06");
+        payload.put("duration", 169);
+        payload.put("mpa", Map.of("id", 1));
+        payload.put("director", List.of(Map.of("id", 42)));
+
+        String json = mapper.writeValueAsString(payload);
 
         Film film = mapper.readValue(json, Film.class);
 
