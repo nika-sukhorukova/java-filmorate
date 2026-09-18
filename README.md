@@ -34,7 +34,7 @@
 | `POST /films`, `PUT /films` | создание и обновление фильма |
 | `PUT /films/{id}/like/{userId}` | поставить лайк |
 | `DELETE /films/{id}/like/{userId}` | снять лайк |
-| `GET /films/popular?count=N` | N самых популярных фильмов |
+| `GET /films/popular?count=N&genreId=&year=` | N самых популярных фильмов; `genreId`/`year` необязательны и фильтруют по жанру/году выхода |
 | `GET /genres`, `GET /genres/{id}` | справочник жанров |
 | `GET /mpa`, `GET /mpa/{id}` | справочник возрастных рейтингов |
 | `POST /reviews`, `PUT /reviews` | создание и редактирование отзыва |

@@ -15,8 +15,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -98,13 +100,26 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     @Override
-    public Collection<Film> findPopular(int count) {
-        String sql = SELECT_FILM
-                + " LEFT JOIN film_likes AS l ON l.film_id = f.id"
-                + " GROUP BY f.id, f.name, f.description, f.release_date, f.duration, f.mpa_rating_id, m.name"
-                + " ORDER BY COUNT(l.user_id) DESC, f.id"
-                + " LIMIT ?";
-        return jdbcTemplate.query(sql, FILM_MAPPER, count);
+    public Collection<Film> findPopular(int count, Integer genreId, Integer year) {
+        List<Object> params = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(SELECT_FILM)
+                .append(" LEFT JOIN film_likes AS l ON l.film_id = f.id");
+
+        if (genreId != null) {
+            sql.append(" JOIN film_genres AS fg ON fg.film_id = f.id AND fg.genre_id = ?");
+            params.add(genreId);
+        }
+        if (year != null) {
+            sql.append(" WHERE EXTRACT(YEAR FROM f.release_date) = ?");
+            params.add(year);
+        }
+
+        sql.append(" GROUP BY f.id, f.name, f.description, f.release_date, f.duration, f.mpa_rating_id, m.name")
+                .append(" ORDER BY COUNT(l.user_id) DESC, f.id")
+                .append(" LIMIT ?");
+        params.add(count);
+
+        return jdbcTemplate.query(sql.toString(), FILM_MAPPER, params.toArray());
     }
 
     @Override

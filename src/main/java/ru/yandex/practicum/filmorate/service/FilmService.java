@@ -96,13 +96,17 @@ public class FilmService {
         log.info("Пользователь {} убрал лайк с фильма {}", userId, filmId);
     }
 
-    public Collection<Film> getPopular(int count) {
+    public Collection<Film> getPopular(int count, Integer genreId, Integer year) {
         if (count <= 0) {
             throw new ValidationException("Параметр count должен быть положительным");
         }
+        if (genreId != null) {
+            genreStorage.findById(genreId)
+                    .orElseThrow(() -> new NotFoundException("Жанр с id=" + genreId + " не найден"));
+        }
 
-        log.debug("Запрошены {} самых популярных фильмов", count);
-        return withDetails(filmStorage.findPopular(count));
+        log.debug("Запрошены {} самых популярных фильмов (genreId={}, year={})", count, genreId, year);
+        return withDetails(filmStorage.findPopular(count, genreId, year));
     }
 
     private Collection<Film> withDetails(Collection<Film> films) {
