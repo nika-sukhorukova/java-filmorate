@@ -1,40 +1,72 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.EventService;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
-import ru.yandex.practicum.filmorate.storage.InMemoryFilmGenreStorage;
-import ru.yandex.practicum.filmorate.storage.InMemoryGenreStorage;
-import ru.yandex.practicum.filmorate.storage.InMemoryMpaStorage;
-import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
-
+import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
+import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
+import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
+import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
+import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
+import ru.yandex.practicum.filmorate.storage.mpa.MpaDbStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 import java.time.LocalDate;
-
+import java.util.Collection;
+import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@JdbcTest
+@AutoConfigureTestDatabase
+@Import({FilmDbStorage.class, UserDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
+        MpaDbStorage.class, DirectorDbStorage.class, EventDbStorage.class})
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 class FilmControllerTest {
+
+    private final FilmDbStorage filmStorage;
+    private final UserDbStorage userStorage;
+    private final GenreDbStorage genreStorage;
+    private final FilmGenreDbStorage filmGenreStorage;
+    private final MpaDbStorage mpaStorage;
+    private final DirectorDbStorage directorStorage;
+    private final EventDbStorage eventStorage;
 
     private FilmController controller;
     private UserController userController;
 
     @BeforeEach
     void setUp() {
-        InMemoryUserStorage userStorage = new InMemoryUserStorage();
-        controller = new FilmController(new FilmService(
-                new InMemoryFilmStorage(),
-                userStorage,
-                new InMemoryGenreStorage(),
-                new InMemoryFilmGenreStorage(),
-                new InMemoryMpaStorage()));
-        userController = new UserController(new UserService(userStorage));
+        EventService eventService = new EventService(eventStorage, userStorage);
+
+        controller = new FilmController(
+                new FilmService(
+                        filmStorage,
+                        userStorage,
+                        genreStorage,
+                        filmGenreStorage,
+                        mpaStorage,
+                        directorStorage,
+                        eventService
+                )
+        );
+
+        userController = new UserController(
+                new UserService(userStorage, eventService)
+        );
     }
 
     private Film.FilmBuilder validFilm() {
@@ -53,6 +85,10 @@ class FilmControllerTest {
                 .name("Имя")
                 .birthday(LocalDate.of(1990, 1, 1))
                 .build());
+    }
+
+    private Director createDirector(String name) {
+        return directorStorage.create(Director.builder().name(name).build());
     }
 
     @Test
@@ -116,10 +152,10 @@ class FilmControllerTest {
 
         controller.update(validFilm().id(liked.getId()).name("Новое имя").build());
 
-        assertThat(controller.getPopular(10)).first()
+        assertThat(controller.getPopular(10, null, null)).first()
                 .extracting(Film::getId)
                 .isEqualTo(liked.getId());
-        assertThat(controller.getPopular(10)).last()
+        assertThat(controller.getPopular(10, null, null)).last()
                 .extracting(Film::getId)
                 .isEqualTo(withoutLikes.getId());
     }
@@ -136,7 +172,7 @@ class FilmControllerTest {
         controller.addLike(likedByTwoUsers.getId(), first.getId());
         controller.addLike(likedByTwoUsers.getId(), second.getId());
 
-        assertThat(controller.getPopular(10)).first()
+        assertThat(controller.getPopular(10, null, null)).first()
                 .extracting(Film::getId)
                 .isEqualTo(likedByTwoUsers.getId());
     }
@@ -159,7 +195,7 @@ class FilmControllerTest {
 
         controller.removeLike(unliked.getId(), user.getId());
 
-        assertThat(controller.getPopular(10)).first()
+        assertThat(controller.getPopular(10, null, null)).first()
                 .extracting(Film::getId)
                 .isEqualTo(liked.getId());
     }
@@ -175,7 +211,7 @@ class FilmControllerTest {
         controller.addLike(popular.getId(), second.getId());
         controller.addLike(unpopular.getId(), first.getId());
 
-        assertThat(controller.getPopular(10)).containsExactly(popular, unpopular);
+        assertThat(controller.getPopular(10, null, null)).containsExactly(popular, unpopular);
     }
 
     @Test
@@ -183,12 +219,344 @@ class FilmControllerTest {
         controller.create(validFilm().build());
         controller.create(validFilm().build());
 
-        assertThat(controller.getPopular(1)).hasSize(1);
+        assertThat(controller.getPopular(1, null, null)).hasSize(1);
     }
 
     @Test
     void getPopular_nonPositiveCount_throwsValidationException() {
-        assertThatThrownBy(() -> controller.getPopular(0))
+        assertThatThrownBy(() -> controller.getPopular(0, null, null))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void getPopular_filtersByGenre() {
+        Film comedy = controller.create(validFilm()
+                .name("Комедия")
+                .genres(Set.of(Genre.builder().id(1).build()))
+                .build());
+        controller.create(validFilm().name("Без жанра").build());
+
+        assertThat(controller.getPopular(10, 1, null))
+                .extracting(Film::getId)
+                .containsExactly(comedy.getId());
+    }
+
+    @Test
+    void getPopular_filtersByYear() {
+        Film recent = controller.create(validFilm().name("Новый").releaseDate(LocalDate.of(2020, 1, 1)).build());
+        controller.create(validFilm().name("Старый").releaseDate(LocalDate.of(2000, 1, 1)).build());
+
+        assertThat(controller.getPopular(10, null, 2020))
+                .extracting(Film::getId)
+                .containsExactly(recent.getId());
+    }
+
+    @Test
+    void getPopular_unknownGenre_throwsNotFoundException() {
+        assertThatThrownBy(() -> controller.getPopular(10, 999, null))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void create_withDirectors_savesAndReturnsThem() {
+        Director nolan = createDirector("Нолан");
+
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findById(created.getId()).getDirectors())
+                .extracting(Director::getId)
+                .containsExactly(nolan.getId());
+    }
+
+    @Test
+    void create_withUnknownDirector_throwsNotFoundException() {
+        Film film = validFilm()
+                .directors(Set.of(Director.builder().id(999L).build()))
+                .build();
+
+        assertThatThrownBy(() -> controller.create(film))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void create_deduplicatesDirectors() {
+        Director nolan = createDirector("Нолан");
+        Director duplicate = Director.builder().id(nolan.getId()).name("Другое имя").build();
+
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build(), duplicate))
+                .build());
+
+        assertThat(controller.findById(created.getId()).getDirectors()).hasSize(1);
+    }
+
+    @Test
+    void update_replacesDirectors() {
+        Director nolan = createDirector("Нолан");
+        Director tarantino = createDirector("Тарантино");
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        controller.update(validFilm()
+                .id(created.getId())
+                .directors(Set.of(Director.builder().id(tarantino.getId()).build()))
+                .build());
+
+        assertThat(controller.findById(created.getId()).getDirectors())
+                .extracting(Director::getId)
+                .containsExactly(tarantino.getId());
+    }
+
+    @Test
+    void update_withEmptyDirectors_clearsThem() {
+        Director nolan = createDirector("Нолан");
+        Film created = controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        controller.update(validFilm().id(created.getId()).build());
+
+        assertThat(controller.findById(created.getId()).getDirectors()).isEmpty();
+    }
+
+    @Test
+    void findAll_returnsFilmsWithDirectors() {
+        Director nolan = createDirector("Нолан");
+        controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findAll())
+                .allSatisfy(f -> assertThat(f.getDirectors()).isNotEmpty());
+    }
+
+    @Test
+    void findByDirector_unknownDirector_throwsNotFoundException() {
+        assertThatThrownBy(() -> controller.findByDirector(999L, "year"))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void findByDirector_invalidSortBy_throwsValidationException() {
+        Director nolan = createDirector("Нолан");
+        controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThatThrownBy(() -> controller.findByDirector(nolan.getId(), "name"))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void findByDirector_sortByYear_ordersByReleaseDate() {
+        Director nolan = createDirector("Нолан");
+        Film older = controller.create(validFilm()
+                .name("Старый")
+                .releaseDate(LocalDate.of(2000, 1, 1))
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        Film newer = controller.create(validFilm()
+                .name("Новый")
+                .releaseDate(LocalDate.of(2020, 1, 1))
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findByDirector(nolan.getId(), "year"))
+                .extracting(Film::getId)
+                .containsExactly(older.getId(), newer.getId());
+    }
+
+    @Test
+    void findByDirector_sortByLikes_ordersByLikesDescending() {
+        Director nolan = createDirector("Нолан");
+        Film unpopular = controller.create(validFilm()
+                .name("Без лайков")
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        Film popular = controller.create(validFilm()
+                .name("С лайками")
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        User first = createUser("first");
+        User second = createUser("second");
+        controller.addLike(popular.getId(), first.getId());
+        controller.addLike(popular.getId(), second.getId());
+        controller.addLike(unpopular.getId(), first.getId());
+
+        assertThat(controller.findByDirector(nolan.getId(), "likes"))
+                .extracting(Film::getId)
+                .containsExactly(popular.getId(), unpopular.getId());
+    }
+
+    @Test
+    void findByDirector_returnsOnlyFilmsOfThatDirector() {
+        Director nolan = createDirector("Нолан");
+        Director tarantino = createDirector("Тарантино");
+        Film nolanFilm = controller.create(validFilm()
+                .name("Нолановский")
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        controller.create(validFilm()
+                .name("Тарантиновский")
+                .directors(Set.of(Director.builder().id(tarantino.getId()).build()))
+                .build());
+
+        assertThat(controller.findByDirector(nolan.getId(), "year"))
+                .extracting(Film::getId)
+                .containsExactly(nolanFilm.getId());
+    }
+
+    @Test
+    void findByDirector_returnsFilmsWithDirectorsAndGenres() {
+        Director nolan = createDirector("Нолан");
+        controller.create(validFilm()
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+
+        assertThat(controller.findByDirector(nolan.getId(), "year"))
+                .allSatisfy(f -> assertThat(f.getDirectors()).isNotEmpty());
+    }
+
+    @Test
+    void findCommonFilms_returnsOnlyFilmsLikedByBoth() {
+        Film common = controller.create(validFilm().name("Общий").build());
+        Film onlyFirst = controller.create(validFilm().name("Только у первого").build());
+        Film onlySecond = controller.create(validFilm().name("Только у второго").build());
+        User first = createUser("first");
+        User second = createUser("second");
+
+        controller.addLike(common.getId(), first.getId());
+        controller.addLike(common.getId(), second.getId());
+        controller.addLike(onlyFirst.getId(), first.getId());
+        controller.addLike(onlySecond.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId()))
+                .extracting(Film::getId)
+                .containsExactly(common.getId());
+    }
+
+    @Test
+    void findCommonFilms_sortsByPopularityDescending() {
+        Film popular = controller.create(validFilm().name("Популярный").build());
+        Film lessPopular = controller.create(validFilm().name("Менее популярный").build());
+        User first = createUser("first");
+        User second = createUser("second");
+        User third = createUser("third");
+
+        controller.addLike(popular.getId(), first.getId());
+        controller.addLike(popular.getId(), second.getId());
+        controller.addLike(popular.getId(), third.getId());
+        controller.addLike(lessPopular.getId(), first.getId());
+        controller.addLike(lessPopular.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId()))
+                .extracting(Film::getId)
+                .containsExactly(popular.getId(), lessPopular.getId());
+    }
+
+    @Test
+    void findCommonFilms_withoutCommonLikes_returnsEmpty() {
+        Film firstFilm = controller.create(validFilm().name("Первый").build());
+        Film secondFilm = controller.create(validFilm().name("Второй").build());
+        User first = createUser("first");
+        User second = createUser("second");
+
+        controller.addLike(firstFilm.getId(), first.getId());
+        controller.addLike(secondFilm.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId())).isEmpty();
+    }
+
+    @Test
+    void findCommonFilms_noLikesAtAll_returnsEmpty() {
+        controller.create(validFilm().build());
+        User first = createUser("first");
+        User second = createUser("second");
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId())).isEmpty();
+    }
+
+    @Test
+    void findCommonFilms_sameUser_returnsFilmsLikedByThatUser() {
+        Film film = controller.create(validFilm().build());
+        User user = createUser("first");
+        controller.addLike(film.getId(), user.getId());
+
+        assertThat(controller.findCommonFilms(user.getId(), user.getId()))
+                .extracting(Film::getId)
+                .containsExactly(film.getId());
+    }
+
+    @Test
+    void findCommonFilms_unknownFriend_throwsNotFoundException() {
+        User user = createUser("first");
+
+        assertThatThrownBy(() -> controller.findCommonFilms(user.getId(), 999L))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void findCommonFilms_unknownUser_throwsNotFoundException() {
+        User user = createUser("first");
+
+        assertThatThrownBy(() -> controller.findCommonFilms(999L, user.getId()))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void findCommonFilms_returnsFilmsWithGenresAndDirectors() {
+        Director nolan = createDirector("Нолан");
+        Film common = controller.create(validFilm()
+                .name("Общий")
+                .genres(Set.of(Genre.builder().id(1).build()))
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        User first = createUser("first");
+        User second = createUser("second");
+        controller.addLike(common.getId(), first.getId());
+        controller.addLike(common.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId()))
+                .singleElement()
+                .satisfies(f -> {
+                    assertThat(f.getDirectors()).isNotEmpty();
+                    assertThat(f.getGenres()).isNotEmpty();
+                });
+    }
+
+    @Test
+    void searchFilmKeyWorld_shouldFindMoviesByKeyword() {
+        Film matchingByName = controller.create(validFilm()
+                .name("Матрица")
+                .description("Обычное описание")
+                .build());
+
+        Film matchingByDescription = controller.create(validFilm()
+                .name("Интерстеллар")
+                .description("Фантастика про космос и черные дыры")
+                .build());
+
+        Collection<Film> searchResult1 = controller.searchFilm("матриц");
+
+        assertThat(searchResult1)
+                .hasSize(1)
+                .extracting(Film::getId)
+                .containsExactly(matchingByName.getId());
+
+        Collection<Film> searchResult2 = controller.searchFilm("космос");
+
+        assertThat(searchResult2)
+                .hasSize(1)
+                .extracting(Film::getId)
+                .containsExactly(matchingByDescription.getId());
+    }
+
+    @Test
+    void searchFilmKeyWorld_shouldThrowException() {
+        assertThatThrownBy(() -> controller.searchFilm("   "))
                 .isInstanceOf(ValidationException.class);
     }
 }

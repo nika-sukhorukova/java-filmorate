@@ -1,25 +1,44 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.EventService;
 import ru.yandex.practicum.filmorate.service.UserService;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Тесты контроллера через реальное DB-хранилище: каждый тест работает с резидентной базой
+ * и откатывается после теста.
+ */
+@JdbcTest
+@AutoConfigureTestDatabase
+@Import({UserDbStorage.class, EventDbStorage.class})
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 class UserControllerTest {
+
+    private final UserDbStorage userStorage;
+    private final EventDbStorage eventStorage;
 
     private UserController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new UserController(new UserService(new InMemoryUserStorage()));
+        EventService eventService = new EventService(eventStorage, userStorage);
+        controller = new UserController(new UserService(userStorage, eventService));
     }
 
     private User.UserBuilder validUser() {

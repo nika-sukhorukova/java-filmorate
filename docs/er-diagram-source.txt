@@ -77,3 +77,25 @@ Table friendships {
   }
   note: 'Дружба: направленная связь со статусом, CHECK (user_id <> friend_id)'
 }
+
+Table reviews {
+  id          bigint        [pk, increment]
+  content     varchar(1000) [not null]
+  is_positive boolean       [not null, note: 'тип отзыва: положительный/отрицательный']
+  user_id     bigint        [not null, ref: > users.id, note: 'автор отзыва']
+  film_id     bigint        [not null, ref: > films.id]
+
+  note: 'Отзывы на фильмы. Рейтинг полезности не хранится — считается по review_likes'
+}
+
+Table review_likes {
+  review_id bigint  [not null, ref: > reviews.id]
+  user_id   bigint  [not null, ref: > users.id]
+  is_useful boolean [not null, note: 'true — полезно (+1), false — бесполезно (-1)']
+
+  Indexes {
+    (review_id, user_id) [pk]
+    user_id
+  }
+  note: 'Голоса за полезность отзыва: один пользователь — один голос на отзыв'
+}
