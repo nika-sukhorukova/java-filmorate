@@ -292,7 +292,7 @@ class DbStorageIntegrationTests {
         filmStorage.addLike(popular.getId(), second.getId());
         filmStorage.addLike(unpopular.getId(), first.getId());
 
-        assertThat(filmStorage.findPopular(10))
+        assertThat(filmStorage.findPopular(10, null, null))
                 .extracting(Film::getId)
                 .containsExactly(popular.getId(), unpopular.getId());
     }
@@ -324,7 +324,48 @@ class DbStorageIntegrationTests {
         filmStorage.create(validFilm("Первый").build());
         filmStorage.create(validFilm("Второй").build());
 
-        assertThat(filmStorage.findPopular(1)).hasSize(1);
+        assertThat(filmStorage.findPopular(1, null, null)).hasSize(1);
+    }
+
+    @Test
+    void findPopular_filtersByGenre() {
+        Film comedy = filmStorage.create(validFilm("Комедия").build());
+        Film drama = filmStorage.create(validFilm("Драма").build());
+        filmGenreStorage.save(comedy.getId(), List.of(Genre.builder().id(1).build()));
+        filmGenreStorage.save(drama.getId(), List.of(Genre.builder().id(2).build()));
+
+        assertThat(filmStorage.findPopular(10, 1, null))
+                .extracting(Film::getId)
+                .containsExactly(comedy.getId());
+    }
+
+    @Test
+    void findPopular_filtersByYear() {
+        filmStorage.create(validFilm("Старый").releaseDate(LocalDate.of(1999, 1, 1)).build());
+        Film recent = filmStorage.create(validFilm("Новый").releaseDate(LocalDate.of(2020, 1, 1)).build());
+
+        assertThat(filmStorage.findPopular(10, null, 2020))
+                .extracting(Film::getId)
+                .containsExactly(recent.getId());
+    }
+
+    @Test
+    void findPopular_filtersByGenreAndYear() {
+        Film moreLiked = filmStorage.create(validFilm("Более популярный").releaseDate(LocalDate.of(2020, 1, 1)).build());
+        Film lessLiked = filmStorage.create(validFilm("Менее популярный").releaseDate(LocalDate.of(2020, 1, 1)).build());
+        Film wrongYear = filmStorage.create(validFilm("Другой год").releaseDate(LocalDate.of(2010, 1, 1)).build());
+        filmGenreStorage.save(moreLiked.getId(), List.of(Genre.builder().id(3).build()));
+        filmGenreStorage.save(lessLiked.getId(), List.of(Genre.builder().id(3).build()));
+        filmGenreStorage.save(wrongYear.getId(), List.of(Genre.builder().id(3).build()));
+        User first = userStorage.create(validUser("first").build());
+        User second = userStorage.create(validUser("second").build());
+        filmStorage.addLike(moreLiked.getId(), first.getId());
+        filmStorage.addLike(moreLiked.getId(), second.getId());
+        filmStorage.addLike(lessLiked.getId(), first.getId());
+
+        assertThat(filmStorage.findPopular(10, 3, 2020))
+                .extracting(Film::getId)
+                .containsExactly(moreLiked.getId(), lessLiked.getId());
     }
 
     @Test

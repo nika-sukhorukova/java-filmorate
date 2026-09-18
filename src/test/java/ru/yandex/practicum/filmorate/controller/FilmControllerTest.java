@@ -9,7 +9,11 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
-import ru.yandex.practicum.filmorate.model.*;
+import ru.yandex.practicum.filmorate.model.Director;
+import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
+import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
@@ -130,10 +134,10 @@ class FilmControllerTest {
 
         controller.update(validFilm().id(liked.getId()).name("Новое имя").build());
 
-        assertThat(controller.getPopular(10)).first()
+        assertThat(controller.getPopular(10, null, null)).first()
                 .extracting(Film::getId)
                 .isEqualTo(liked.getId());
-        assertThat(controller.getPopular(10)).last()
+        assertThat(controller.getPopular(10, null, null)).last()
                 .extracting(Film::getId)
                 .isEqualTo(withoutLikes.getId());
     }
@@ -150,7 +154,7 @@ class FilmControllerTest {
         controller.addLike(likedByTwoUsers.getId(), first.getId());
         controller.addLike(likedByTwoUsers.getId(), second.getId());
 
-        assertThat(controller.getPopular(10)).first()
+        assertThat(controller.getPopular(10, null, null)).first()
                 .extracting(Film::getId)
                 .isEqualTo(likedByTwoUsers.getId());
     }
@@ -173,7 +177,7 @@ class FilmControllerTest {
 
         controller.removeLike(unliked.getId(), user.getId());
 
-        assertThat(controller.getPopular(10)).first()
+        assertThat(controller.getPopular(10, null, null)).first()
                 .extracting(Film::getId)
                 .isEqualTo(liked.getId());
     }
@@ -189,7 +193,7 @@ class FilmControllerTest {
         controller.addLike(popular.getId(), second.getId());
         controller.addLike(unpopular.getId(), first.getId());
 
-        assertThat(controller.getPopular(10)).containsExactly(popular, unpopular);
+        assertThat(controller.getPopular(10, null, null)).containsExactly(popular, unpopular);
     }
 
     @Test
@@ -197,13 +201,42 @@ class FilmControllerTest {
         controller.create(validFilm().build());
         controller.create(validFilm().build());
 
-        assertThat(controller.getPopular(1)).hasSize(1);
+        assertThat(controller.getPopular(1, null, null)).hasSize(1);
     }
 
     @Test
     void getPopular_nonPositiveCount_throwsValidationException() {
-        assertThatThrownBy(() -> controller.getPopular(0))
+        assertThatThrownBy(() -> controller.getPopular(0, null, null))
                 .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void getPopular_filtersByGenre() {
+        Film comedy = controller.create(validFilm()
+                .name("Комедия")
+                .genres(Set.of(Genre.builder().id(1).build()))
+                .build());
+        controller.create(validFilm().name("Без жанра").build());
+
+        assertThat(controller.getPopular(10, 1, null))
+                .extracting(Film::getId)
+                .containsExactly(comedy.getId());
+    }
+
+    @Test
+    void getPopular_filtersByYear() {
+        Film recent = controller.create(validFilm().name("Новый").releaseDate(LocalDate.of(2020, 1, 1)).build());
+        controller.create(validFilm().name("Старый").releaseDate(LocalDate.of(2000, 1, 1)).build());
+
+        assertThat(controller.getPopular(10, null, 2020))
+                .extracting(Film::getId)
+                .containsExactly(recent.getId());
+    }
+
+    @Test
+    void getPopular_unknownGenre_throwsNotFoundException() {
+        assertThatThrownBy(() -> controller.getPopular(10, 999, null))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
