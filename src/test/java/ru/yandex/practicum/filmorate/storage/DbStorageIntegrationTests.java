@@ -8,19 +8,13 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import ru.yandex.practicum.filmorate.model.Director;
-import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Event;
 import ru.yandex.practicum.filmorate.model.EventOperation;
 import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
-import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.Review;
-import ru.yandex.practicum.filmorate.model.Review;
-import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
 import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
@@ -871,6 +865,18 @@ class DbStorageIntegrationTests {
         assertThat(eventStorage.findByUserId(first.getId()))
                 .extracting(Event::getTimestamp)
                 .containsExactly(1000L, 2000L);
+    }
+
+    @Test
+    void findEventsByUserId_sameTimestamp_ordersByEventId() {
+        User user = userStorage.create(validUser("first").build());
+
+        Event first = eventStorage.create(event(1000L, user.getId()));
+        Event second = eventStorage.create(event(1000L, user.getId()));
+
+        assertThat(eventStorage.findByUserId(user.getId()))
+                .extracting(Event::getEventId)
+                .containsExactly(first.getEventId(), second.getEventId());
     }
 
     private String statusOf(Long userId, Long friendId) {

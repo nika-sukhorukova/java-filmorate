@@ -10,7 +10,9 @@ import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.EventService;
 import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
@@ -24,17 +26,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @JdbcTest
 @AutoConfigureTestDatabase
-@Import(UserDbStorage.class)
+@Import({UserDbStorage.class, EventDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class UserControllerTest {
 
     private final UserDbStorage userStorage;
+    private final EventDbStorage eventStorage;
 
     private UserController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new UserController(new UserService(userStorage));
+        EventService eventService = new EventService(eventStorage, userStorage);
+        controller = new UserController(new UserService(userStorage, eventService));
     }
 
     private User.UserBuilder validUser() {

@@ -2,10 +2,11 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.EventOperation;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.Review;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.review.ReviewStorage;
@@ -22,14 +23,17 @@ public class ReviewService {
     private final ReviewStorage reviewStorage;
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
+    private final EventService eventService;
 
     @Autowired
     public ReviewService(ReviewStorage reviewStorage,
-                         @Qualifier("filmDbStorage") FilmStorage filmStorage,
-                         @Qualifier("userDbStorage") UserStorage userStorage) {
+                         FilmStorage filmStorage,
+                         UserStorage userStorage,
+                         EventService eventService) {
         this.reviewStorage = reviewStorage;
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
+        this.eventService = eventService;
     }
 
     public Review create(Review review) {
@@ -37,6 +41,13 @@ public class ReviewService {
         checkUserExists(review.getUserId());
 
         Review created = reviewStorage.create(review);
+        eventService.addEvent(
+                created.getUserId(),
+                EventType.REVIEW,
+                EventOperation.ADD,
+                created.getReviewId()
+        );
+
         log.info("Добавлен новый отзыв id={} на фильм {}", created.getReviewId(), created.getFilmId());
         return created;
     }
@@ -53,13 +64,28 @@ public class ReviewService {
                 .build();
 
         Review updated = reviewStorage.update(toUpdate);
+        eventService.addEvent(
+                existing.getUserId(),
+                EventType.REVIEW,
+                EventOperation.UPDATE,
+                updated.getReviewId()
+        );
+
         log.info("Отзыв с id {} обновлён", updated.getReviewId());
         return updated;
     }
 
     public void delete(Long id) {
-        findById(id);
+        Review existing = findById(id);
+
         reviewStorage.delete(id);
+        eventService.addEvent(
+                existing.getUserId(),
+                EventType.REVIEW,
+                EventOperation.REMOVE,
+                id
+        );
+
         log.info("Удалён отзыв id={}", id);
     }
 

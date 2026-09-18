@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.EventOperation;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
@@ -16,6 +18,7 @@ import java.util.Collection;
 public class UserService {
 
     private final UserStorage userStorage;
+    private final EventService eventService;
 
     public Collection<User> findAll() {
         return userStorage.findAll();
@@ -59,6 +62,7 @@ public class UserService {
         }
 
         userStorage.addFriend(id, friendId);
+        eventService.addEvent(id, EventType.FRIEND, EventOperation.ADD, friendId);
         log.info("Пользователь {} добавил в друзья пользователя {}", id, friendId);
     }
 
@@ -67,6 +71,7 @@ public class UserService {
         findById(friendId);
 
         userStorage.removeFriend(id, friendId);
+        eventService.addEvent(id, EventType.FRIEND, EventOperation.REMOVE, friendId);
         log.info("Пользователь {} удалил из друзей пользователя {}", id, friendId);
     }
 
