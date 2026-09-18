@@ -351,14 +351,21 @@ class DbStorageIntegrationTests {
 
     @Test
     void findPopular_filtersByGenreAndYear() {
-        Film matches = filmStorage.create(validFilm("Подходит").releaseDate(LocalDate.of(2020, 1, 1)).build());
+        Film moreLiked = filmStorage.create(validFilm("Более популярный").releaseDate(LocalDate.of(2020, 1, 1)).build());
+        Film lessLiked = filmStorage.create(validFilm("Менее популярный").releaseDate(LocalDate.of(2020, 1, 1)).build());
         Film wrongYear = filmStorage.create(validFilm("Другой год").releaseDate(LocalDate.of(2010, 1, 1)).build());
-        filmGenreStorage.save(matches.getId(), List.of(Genre.builder().id(3).build()));
+        filmGenreStorage.save(moreLiked.getId(), List.of(Genre.builder().id(3).build()));
+        filmGenreStorage.save(lessLiked.getId(), List.of(Genre.builder().id(3).build()));
         filmGenreStorage.save(wrongYear.getId(), List.of(Genre.builder().id(3).build()));
+        User first = userStorage.create(validUser("first").build());
+        User second = userStorage.create(validUser("second").build());
+        filmStorage.addLike(moreLiked.getId(), first.getId());
+        filmStorage.addLike(moreLiked.getId(), second.getId());
+        filmStorage.addLike(lessLiked.getId(), first.getId());
 
         assertThat(filmStorage.findPopular(10, 3, 2020))
                 .extracting(Film::getId)
-                .containsExactly(matches.getId());
+                .containsExactly(moreLiked.getId(), lessLiked.getId());
     }
 
     @Test
