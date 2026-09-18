@@ -218,4 +218,27 @@ class UserControllerTest {
 
         assertThat(controller.getCommonFriends(first.getId(), second.getId())).isEmpty();
     }
+
+    @Test
+    void deleteUser() {
+        User user = controller.create(validUser().build());
+        long userId = user.getId();
+
+        assertThat(controller.findById(userId)).isNotNull();
+
+        controller.deleteUser(userId);
+
+        assertThatThrownBy(() -> controller.findById(userId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Пользователь с id=" + userId + " не найден");
+    }
+
+    @Test
+    void deleteUser_shouldThrowNotFoundException() {
+        long nonExistentId = 9999L;
+
+        assertThatThrownBy(() -> controller.deleteUser(nonExistentId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Пользователь с id=" + nonExistentId + " не найден");
+    }
 }
