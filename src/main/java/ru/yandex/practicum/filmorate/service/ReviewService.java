@@ -1,7 +1,7 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
@@ -16,6 +16,7 @@ import java.util.Collection;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ReviewService {
 
     private static final int DEFAULT_COUNT = 10;
@@ -24,17 +25,6 @@ public class ReviewService {
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
     private final EventService eventService;
-
-    @Autowired
-    public ReviewService(ReviewStorage reviewStorage,
-                         FilmStorage filmStorage,
-                         UserStorage userStorage,
-                         EventService eventService) {
-        this.reviewStorage = reviewStorage;
-        this.filmStorage = filmStorage;
-        this.userStorage = userStorage;
-        this.eventService = eventService;
-    }
 
     public Review create(Review review) {
         checkFilmExists(review.getFilmId());
