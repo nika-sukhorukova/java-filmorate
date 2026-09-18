@@ -85,4 +85,10 @@ public class FilmController {
         log.debug("GET /films/common?userId={}&friendId={}", userId, friendId);
         return filmService.findCommonFilms(userId, friendId);
     }
+
+    @GetMapping("/{text}")
+    public Collection<Film> searchFilm(@PathVariable String text) {
+        log.debug("GET /?KeyWorld={}", text);
+        return filmService.searchFilmKeyWorld(text);
+    }
 }

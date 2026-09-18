@@ -212,7 +212,7 @@ public class FilmService {
                         "Режиссёр с id=" + directorId + " не найден"));
 
         Collection<Film> films = switch (sortBy) {
-            case "year"  -> filmStorage.findByDirectorSortedByYear(directorId);
+            case "year" -> filmStorage.findByDirectorSortedByYear(directorId);
             case "likes" -> filmStorage.findByDirectorSortedByLikes(directorId);
             default -> throw new ValidationException(
                     "Параметр sortBy должен быть 'year' или 'likes', получено: " + sortBy);
@@ -225,5 +225,18 @@ public class FilmService {
         checkUserExists(userId);
         checkUserExists(friendId);
         return withDetails(filmStorage.findCommonFilms(userId, friendId));
+    }
+
+    public Collection<Film> searchFilmKeyWorld(String keyWorld) {
+        if (keyWorld == null || keyWorld.isBlank()) {
+            throw new ValidationException("Ключевое слово для поиска не должно быть пустым");
+        }
+        Collection<Film> foundFilms = filmStorage.searchFilmKeyWorld(keyWorld);
+
+        if (foundFilms.isEmpty()) {
+            throw new NotFoundException("Фильмы по ключевому слову '" + keyWorld + "' не найдены");
+        }
+
+        return foundFilms;
     }
 }
