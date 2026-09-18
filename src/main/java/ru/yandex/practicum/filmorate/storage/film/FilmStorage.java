@@ -34,4 +34,6 @@ public interface FilmStorage {
      * с другими пользователями.
      */
     Collection<Film> findRecommendations(Long userId);
+
+    Collection<Film> findCommonFilms(Long userId, Long friendId);
 }

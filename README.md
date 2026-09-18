@@ -35,6 +35,7 @@
 | `PUT /films/{id}/like/{userId}` | поставить лайк |
 | `DELETE /films/{id}/like/{userId}` | снять лайк |
 | `GET /films/popular?count=N&genreId=&year=` | N самых популярных фильмов; `genreId`/`year` необязательны и фильтруют по жанру/году выхода |
+| `GET /films/common?userId={userId}&friendId={friendId}` | фильмы, лайкнутые обоими пользователями, отсортированные по популярности |
 | `GET /genres`, `GET /genres/{id}` | справочник жанров |
 | `GET /mpa`, `GET /mpa/{id}` | справочник возрастных рейтингов |
 | `POST /reviews`, `PUT /reviews` | создание и редактирование отзыва |
@@ -285,6 +286,22 @@ LIMIT ?;
 
 Здесь тоже `LEFT JOIN`: фильмы без лайков должны присутствовать в выдаче, иначе на свежей
 базе топ окажется пустым.
+
+### Общие фильмы двух пользователей
+
+```sql
+SELECT f.id,
+       f.name,
+       COUNT(fl.user_id) AS likes_count
+FROM films AS f
+LEFT JOIN film_likes AS fl ON fl.film_id = f.id
+WHERE EXISTS (SELECT 1 FROM film_likes AS fl1
+              WHERE fl1.film_id = f.id AND fl1.user_id = ?)
+  AND EXISTS (SELECT 1 FROM film_likes AS fl2
+              WHERE fl2.film_id = f.id AND fl2.user_id = ?)
+GROUP BY f.id, f.name
+ORDER BY likes_count DESC, f.id;
+```
 
 ### Все пользователи
 

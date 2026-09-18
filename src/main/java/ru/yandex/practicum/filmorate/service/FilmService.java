@@ -214,4 +214,10 @@ public class FilmService {
 
         return withDetails(films);
     }
+
+    public Collection<Film> findCommonFilms(Long userId, Long friendId) {
+        checkUserExists(userId);
+        checkUserExists(friendId);
+        return withDetails(filmStorage.findCommonFilms(userId, friendId));
+    }
 }

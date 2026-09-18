@@ -751,6 +751,77 @@ class DbStorageIntegrationTests {
         assertThat(reviewStorage.findByFilmId(film.getId(), 1)).hasSize(1);
     }
 
+    @Test
+    void findCommonFilms_returnsOnlyFilmsLikedByBoth() {
+        User first = userStorage.create(validUser("first").build());
+        User second = userStorage.create(validUser("second").build());
+
+        Film common = filmStorage.create(validFilm("Общий").build());
+        Film onlyFirst = filmStorage.create(validFilm("Только первый").build());
+        Film onlySecond = filmStorage.create(validFilm("Только второй").build());
+
+        filmStorage.addLike(common.getId(), first.getId());
+        filmStorage.addLike(common.getId(), second.getId());
+        filmStorage.addLike(onlyFirst.getId(), first.getId());
+        filmStorage.addLike(onlySecond.getId(), second.getId());
+
+        assertThat(filmStorage.findCommonFilms(first.getId(), second.getId()))
+                .extracting(Film::getId)
+                .containsExactly(common.getId());
+    }
+
+    @Test
+    void findCommonFilms_sortsByLikesCountDescending() {
+        User first = userStorage.create(validUser("first").build());
+        User second = userStorage.create(validUser("second").build());
+        User third = userStorage.create(validUser("third").build());
+
+        Film popular = filmStorage.create(validFilm("Популярный").build());
+        Film lessPopular = filmStorage.create(validFilm("Менее популярный").build());
+
+        addLikes(first, popular, lessPopular);
+        addLikes(second, popular, lessPopular);
+        addLikes(third, popular);
+
+        assertThat(filmStorage.findCommonFilms(first.getId(), second.getId()))
+                .extracting(Film::getId)
+                .containsExactly(popular.getId(), lessPopular.getId());
+    }
+
+    @Test
+    void findCommonFilms_withoutCommonLikes_returnsEmpty() {
+        User first = userStorage.create(validUser("first").build());
+        User second = userStorage.create(validUser("second").build());
+
+        Film firstFilm = filmStorage.create(validFilm("Первый").build());
+        Film secondFilm = filmStorage.create(validFilm("Второй").build());
+
+        filmStorage.addLike(firstFilm.getId(), first.getId());
+        filmStorage.addLike(secondFilm.getId(), second.getId());
+
+        assertThat(filmStorage.findCommonFilms(first.getId(), second.getId())).isEmpty();
+    }
+
+    @Test
+    void findCommonFilms_sameUser_returnsThatUsersLikedFilms() {
+        User user = userStorage.create(validUser("first").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        filmStorage.addLike(film.getId(), user.getId());
+
+        assertThat(filmStorage.findCommonFilms(user.getId(), user.getId()))
+                .extracting(Film::getId)
+                .containsExactly(film.getId());
+    }
+
+    @Test
+    void findCommonFilms_noLikes_returnsEmpty() {
+        User first = userStorage.create(validUser("first").build());
+        User second = userStorage.create(validUser("second").build());
+        filmStorage.create(validFilm("Фильм").build());
+
+        assertThat(filmStorage.findCommonFilms(first.getId(), second.getId())).isEmpty();
+    }
+
     private String statusOf(Long userId, Long friendId) {
         return jdbcTemplate.queryForObject(
                 "SELECT s.name FROM friendships AS f JOIN friendship_statuses AS s ON s.id = f.status_id"
