@@ -85,4 +85,10 @@ public class FilmController {
         log.debug("GET /films/common?userId={}&friendId={}", userId, friendId);
         return filmService.findCommonFilms(userId, friendId);
     }
+
+    @DeleteMapping("/{id}")
+    public void deleteFilm( @PathVariable long id) {
+        log.debug("DELETE /films/{}", id);
+        filmService.deleteFilm(id);
+    }
 }

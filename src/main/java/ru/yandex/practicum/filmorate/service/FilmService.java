@@ -220,4 +220,9 @@ public class FilmService {
         checkUserExists(friendId);
         return withDetails(filmStorage.findCommonFilms(userId, friendId));
     }
+
+    public void deleteFilm(Long filmId) {
+        findById(filmId);
+        filmStorage.deleteFilm(filmId);
+    }
 }

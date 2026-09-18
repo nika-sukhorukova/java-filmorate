@@ -86,4 +86,9 @@ public class UserService {
             user.setName(user.getLogin());
         }
     }
+
+    public void deleteUser(Long userId) {
+        findById(userId);
+        userStorage.deletedUser(userId);
+    }
 }
