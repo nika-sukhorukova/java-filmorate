@@ -530,18 +530,13 @@ class FilmControllerTest {
     @Test
     void searchFilmKeyWorld_shouldFindMoviesByKeyword() {
         Film matchingByName = controller.create(validFilm()
-                .name("Матрица Перезагрузка")
+                .name("Матрица")
                 .description("Обычное описание")
                 .build());
 
         Film matchingByDescription = controller.create(validFilm()
                 .name("Интерстеллар")
-                .description("Культовая фантастика про космос и черные дыры")
-                .build());
-
-        Film nonMatching = controller.create(validFilm()
-                .name("Титаник")
-                .description("Мелодрама про корабль")
+                .description("Фантастика про космос и черные дыры")
                 .build());
 
         Collection<Film> searchResult1 = controller.searchFilm("матриц");
@@ -557,5 +552,11 @@ class FilmControllerTest {
                 .hasSize(1)
                 .extracting(Film::getId)
                 .containsExactly(matchingByDescription.getId());
+    }
+
+    @Test
+    void searchFilmKeyWorld_shouldThrowException() {
+        assertThatThrownBy(() -> controller.searchFilm("   "))
+                .isInstanceOf(ValidationException.class);
     }
 }
