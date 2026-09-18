@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.Director;
+import ru.yandex.practicum.filmorate.model.EventOperation;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
@@ -35,6 +37,8 @@ public class FilmService {
     private final FilmGenreStorage filmGenreStorage;
     private final MpaStorage mpaStorage;
     private final DirectorStorage directorStorage;
+
+    private final EventService eventService;
 
     public Collection<Film> findAll() {
         return withDetails(filmStorage.findAll());
@@ -85,6 +89,7 @@ public class FilmService {
         checkUserExists(userId);
 
         filmStorage.addLike(filmId, userId);
+        eventService.addEvent(userId, EventType.LIKE, EventOperation.ADD, filmId);
         log.info("Пользователь {} поставил лайк фильму {}", userId, filmId);
     }
 
@@ -93,6 +98,7 @@ public class FilmService {
         checkUserExists(userId);
 
         filmStorage.removeLike(filmId, userId);
+        eventService.addEvent(userId, EventType.LIKE, EventOperation.REMOVE, filmId);
         log.info("Пользователь {} убрал лайк с фильма {}", userId, filmId);
     }
 

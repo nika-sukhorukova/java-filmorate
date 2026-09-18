@@ -14,9 +14,11 @@ import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.EventService;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
+import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
@@ -30,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @JdbcTest
 @AutoConfigureTestDatabase
 @Import({FilmDbStorage.class, UserDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
-        MpaDbStorage.class, DirectorDbStorage.class})
+        MpaDbStorage.class, DirectorDbStorage.class, EventDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class FilmControllerTest {
 
@@ -40,15 +42,30 @@ class FilmControllerTest {
     private final FilmGenreDbStorage filmGenreStorage;
     private final MpaDbStorage mpaStorage;
     private final DirectorDbStorage directorStorage;
+    private final EventDbStorage eventStorage;
 
     private FilmController controller;
     private UserController userController;
 
     @BeforeEach
     void setUp() {
+        EventService eventService = new EventService(eventStorage, userStorage);
+
         controller = new FilmController(
-                new FilmService(filmStorage, userStorage, genreStorage, filmGenreStorage, mpaStorage, directorStorage));
-        userController = new UserController(new UserService(userStorage));
+                new FilmService(
+                        filmStorage,
+                        userStorage,
+                        genreStorage,
+                        filmGenreStorage,
+                        mpaStorage,
+                        directorStorage,
+                        eventService
+                )
+        );
+
+        userController = new UserController(
+                new UserService(userStorage, eventService)
+        );
     }
 
     private Film.FilmBuilder validFilm() {

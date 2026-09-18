@@ -8,15 +8,20 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.Event;
+import ru.yandex.practicum.filmorate.model.EventOperation;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.Review;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 import ru.yandex.practicum.filmorate.storage.review.ReviewDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,16 +33,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @JdbcTest
 @AutoConfigureTestDatabase
-@Import({ReviewDbStorage.class, FilmDbStorage.class, UserDbStorage.class})
+@Import({ReviewDbStorage.class, FilmDbStorage.class, UserDbStorage.class, EventDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class ReviewServiceTest {
 
     private final ReviewDbStorage reviewStorage;
     private final FilmDbStorage filmStorage;
     private final UserDbStorage userStorage;
+    private final EventDbStorage eventStorage;
 
     private ReviewService service() {
-        return new ReviewService(reviewStorage, filmStorage, userStorage);
+        EventService eventService = new EventService(eventStorage, userStorage);
+        return new ReviewService(reviewStorage, filmStorage, userStorage, eventService);
     }
 
     private User createUser() {
@@ -220,5 +227,66 @@ class ReviewServiceTest {
 
         assertThatThrownBy(() -> service().removeDislike(created.getReviewId(), 999L))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void create_addsReviewEvent() {
+        User user = createUser();
+        Film film = createFilm();
+
+        Review created = service().create(validReview(user.getId(), film.getId()).build());
+
+        List<Event> events = List.copyOf(eventStorage.findByUserId(user.getId()));
+
+        assertThat(events).hasSize(1);
+
+        Event event = events.getFirst();
+
+        assertThat(event.getUserId()).isEqualTo(user.getId());
+        assertThat(event.getEventType()).isEqualTo(EventType.REVIEW);
+        assertThat(event.getOperation()).isEqualTo(EventOperation.ADD);
+        assertThat(event.getEntityId()).isEqualTo(created.getReviewId());
+    }
+
+    @Test
+    void update_addsReviewEvent() {
+        User user = createUser();
+        Film film = createFilm();
+        Review created = service().create(validReview(user.getId(), film.getId()).build());
+
+        service().update(Review.builder()
+                .reviewId(created.getReviewId())
+                .content("Новый текст")
+                .isPositive(false)
+                .build());
+
+        List<Event> events = List.copyOf(eventStorage.findByUserId(user.getId()));
+
+        assertThat(events).hasSize(2);
+
+        Event event = events.get(1);
+        assertThat(event.getUserId()).isEqualTo(user.getId());
+        assertThat(event.getEventType()).isEqualTo(EventType.REVIEW);
+        assertThat(event.getOperation()).isEqualTo(EventOperation.UPDATE);
+        assertThat(event.getEntityId()).isEqualTo(created.getReviewId());
+    }
+
+    @Test
+    void delete_addsReviewEvent() {
+        User user = createUser();
+        Film film = createFilm();
+        Review created = service().create(validReview(user.getId(), film.getId()).build());
+
+        service().delete(created.getReviewId());
+
+        List<Event> events = List.copyOf(eventStorage.findByUserId(user.getId()));
+
+        assertThat(events).hasSize(2);
+
+        Event event = events.get(1);
+        assertThat(event.getUserId()).isEqualTo(user.getId());
+        assertThat(event.getEventType()).isEqualTo(EventType.REVIEW);
+        assertThat(event.getOperation()).isEqualTo(EventOperation.REMOVE);
+        assertThat(event.getEntityId()).isEqualTo(created.getReviewId());
     }
 }

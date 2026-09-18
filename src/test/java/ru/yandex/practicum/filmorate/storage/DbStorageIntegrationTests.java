@@ -8,12 +8,16 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import ru.yandex.practicum.filmorate.model.Director;
+import ru.yandex.practicum.filmorate.model.Event;
+import ru.yandex.practicum.filmorate.model.EventOperation;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.Review;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
+import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.FilmGenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
@@ -37,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @JdbcTest
 @AutoConfigureTestDatabase
 @Import({UserDbStorage.class, FilmDbStorage.class, GenreDbStorage.class, FilmGenreDbStorage.class,
-        MpaDbStorage.class, ReviewDbStorage.class, DirectorDbStorage.class})
+        MpaDbStorage.class, ReviewDbStorage.class, DirectorDbStorage.class, EventDbStorage.class})
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class DbStorageIntegrationTests {
 
@@ -48,6 +52,7 @@ class DbStorageIntegrationTests {
     private final MpaDbStorage mpaStorage;
     private final ReviewDbStorage reviewStorage;
     private final DirectorDbStorage directorStorage;
+    private final EventDbStorage eventStorage;
     private final JdbcTemplate jdbcTemplate;
 
     private User.UserBuilder validUser(String login) {
@@ -829,6 +834,51 @@ class DbStorageIntegrationTests {
         assertThat(filmStorage.findCommonFilms(first.getId(), second.getId())).isEmpty();
     }
 
+    @Test
+    void createEvent_savesFieldsAndAssignsId() {
+        User user = userStorage.create(validUser("first").build());
+
+        Event event = Event.builder()
+                .timestamp(1000L)
+                .userId(user.getId())
+                .eventType(EventType.LIKE)
+                .operation(EventOperation.ADD)
+                .entityId(10L)
+                .build();
+
+        Event created = eventStorage.create(event);
+
+        assertThat(created.getEventId()).isNotNull();
+        assertThat(eventStorage.findByUserId(user.getId()))
+                .containsExactly(created);
+    }
+
+    @Test
+    void findEventsByUserId_returnsOnlyUserEventsOrderedByTimestamp() {
+        User first = userStorage.create(validUser("first").build());
+        User second = userStorage.create(validUser("second").build());
+
+        eventStorage.create(event(2000L, first.getId()));
+        eventStorage.create(event(3000L, second.getId()));
+        eventStorage.create(event(1000L, first.getId()));
+
+        assertThat(eventStorage.findByUserId(first.getId()))
+                .extracting(Event::getTimestamp)
+                .containsExactly(1000L, 2000L);
+    }
+
+    @Test
+    void findEventsByUserId_sameTimestamp_ordersByEventId() {
+        User user = userStorage.create(validUser("first").build());
+
+        Event first = eventStorage.create(event(1000L, user.getId()));
+        Event second = eventStorage.create(event(1000L, user.getId()));
+
+        assertThat(eventStorage.findByUserId(user.getId()))
+                .extracting(Event::getEventId)
+                .containsExactly(first.getEventId(), second.getEventId());
+    }
+
     private String statusOf(Long userId, Long friendId) {
         return jdbcTemplate.queryForObject(
                 "SELECT s.name FROM friendships AS f JOIN friendship_statuses AS s ON s.id = f.status_id"
@@ -839,6 +889,16 @@ class DbStorageIntegrationTests {
     private Integer countLikes(Long filmId) {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM film_likes WHERE film_id = ?", Integer.class, filmId);
+    }
+
+    private Event event(Long timestamp, Long userId) {
+        return Event.builder()
+                .timestamp(timestamp)
+                .userId(userId)
+                .eventType(EventType.LIKE)
+                .operation(EventOperation.ADD)
+                .entityId(10L)
+                .build();
     }
 
     private void addLikes(User user, Film... films) {
