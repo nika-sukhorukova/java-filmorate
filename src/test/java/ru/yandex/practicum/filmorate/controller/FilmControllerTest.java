@@ -9,10 +9,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
-import ru.yandex.practicum.filmorate.model.Director;
-import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Mpa;
-import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.*;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
@@ -370,5 +367,112 @@ class FilmControllerTest {
 
         assertThat(controller.findByDirector(nolan.getId(), "year"))
                 .allSatisfy(f -> assertThat(f.getDirectors()).isNotEmpty());
+    }
+
+    @Test
+    void findCommonFilms_returnsOnlyFilmsLikedByBoth() {
+        Film common = controller.create(validFilm().name("Общий").build());
+        Film onlyFirst = controller.create(validFilm().name("Только у первого").build());
+        Film onlySecond = controller.create(validFilm().name("Только у второго").build());
+        User first = createUser("first");
+        User second = createUser("second");
+
+        controller.addLike(common.getId(), first.getId());
+        controller.addLike(common.getId(), second.getId());
+        controller.addLike(onlyFirst.getId(), first.getId());
+        controller.addLike(onlySecond.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId()))
+                .extracting(Film::getId)
+                .containsExactly(common.getId());
+    }
+
+    @Test
+    void findCommonFilms_sortsByPopularityDescending() {
+        Film popular = controller.create(validFilm().name("Популярный").build());
+        Film lessPopular = controller.create(validFilm().name("Менее популярный").build());
+        User first = createUser("first");
+        User second = createUser("second");
+        User third = createUser("third");
+
+        controller.addLike(popular.getId(), first.getId());
+        controller.addLike(popular.getId(), second.getId());
+        controller.addLike(popular.getId(), third.getId());
+        controller.addLike(lessPopular.getId(), first.getId());
+        controller.addLike(lessPopular.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId()))
+                .extracting(Film::getId)
+                .containsExactly(popular.getId(), lessPopular.getId());
+    }
+
+    @Test
+    void findCommonFilms_withoutCommonLikes_returnsEmpty() {
+        Film firstFilm = controller.create(validFilm().name("Первый").build());
+        Film secondFilm = controller.create(validFilm().name("Второй").build());
+        User first = createUser("first");
+        User second = createUser("second");
+
+        controller.addLike(firstFilm.getId(), first.getId());
+        controller.addLike(secondFilm.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId())).isEmpty();
+    }
+
+    @Test
+    void findCommonFilms_noLikesAtAll_returnsEmpty() {
+        controller.create(validFilm().build());
+        User first = createUser("first");
+        User second = createUser("second");
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId())).isEmpty();
+    }
+
+    @Test
+    void findCommonFilms_sameUser_returnsFilmsLikedByThatUser() {
+        Film film = controller.create(validFilm().build());
+        User user = createUser("first");
+        controller.addLike(film.getId(), user.getId());
+
+        assertThat(controller.findCommonFilms(user.getId(), user.getId()))
+                .extracting(Film::getId)
+                .containsExactly(film.getId());
+    }
+
+    @Test
+    void findCommonFilms_unknownFriend_throwsNotFoundException() {
+        User user = createUser("first");
+
+        assertThatThrownBy(() -> controller.findCommonFilms(user.getId(), 999L))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void findCommonFilms_unknownUser_throwsNotFoundException() {
+        User user = createUser("first");
+
+        assertThatThrownBy(() -> controller.findCommonFilms(999L, user.getId()))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void findCommonFilms_returnsFilmsWithGenresAndDirectors() {
+        Director nolan = createDirector("Нолан");
+        Film common = controller.create(validFilm()
+                .name("Общий")
+                .genres(Set.of(Genre.builder().id(1).build()))
+                .directors(Set.of(Director.builder().id(nolan.getId()).build()))
+                .build());
+        User first = createUser("first");
+        User second = createUser("second");
+        controller.addLike(common.getId(), first.getId());
+        controller.addLike(common.getId(), second.getId());
+
+        assertThat(controller.findCommonFilms(first.getId(), second.getId()))
+                .singleElement()
+                .satisfies(f -> {
+                    assertThat(f.getDirectors()).isNotEmpty();
+                    assertThat(f.getGenres()).isNotEmpty();
+                });
     }
 }
