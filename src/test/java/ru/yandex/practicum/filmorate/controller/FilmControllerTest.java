@@ -525,4 +525,25 @@ class FilmControllerTest {
                     assertThat(f.getGenres()).isNotEmpty();
                 });
     }
+
+    @Test
+    void deleteFilm() {
+        Film film = controller.create(validFilm().name("первый").build());
+        long filmId = film.getId();
+
+        controller.deleteFilm(filmId);
+
+        assertThatThrownBy(() -> controller.findById(filmId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Фильм c id=" + filmId + " не найден");
+    }
+
+    @Test
+    void deleteFilm_shouldThrowNotFoundException() {
+        long nonExistentId = 9999L;
+
+        assertThatThrownBy(() -> controller.deleteFilm(nonExistentId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Фильм c id=" + nonExistentId + " не найден");
+    }
 }

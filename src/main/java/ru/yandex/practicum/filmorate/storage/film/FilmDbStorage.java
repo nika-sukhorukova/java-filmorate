@@ -206,4 +206,9 @@ public class FilmDbStorage implements FilmStorage {
                 + " ORDER BY (SELECT COUNT(*) FROM film_likes AS fl3 WHERE fl3.film_id = f.id) DESC, f.id";
         return jdbcTemplate.query(sql, FILM_MAPPER, userId, friendId);
     }
+
+    @Override
+    public void deleteFilm(Long filmId) {
+        jdbcTemplate.update("DELETE FROM films WHERE id = ?", filmId);
+    }
 }
