@@ -37,5 +37,5 @@ public interface FilmStorage {
 
     Collection<Film> findCommonFilms(Long userId, Long friendId);
 
-    Collection<Film> searchFilmKeyWorld(String keyWorld);
+    Collection<Film> searchFilm(String query, String by);
 }

@@ -86,9 +86,9 @@ public class FilmController {
         return filmService.findCommonFilms(userId, friendId);
     }
 
-    @GetMapping("/{text}")
-    public Collection<Film> searchFilm(@PathVariable String text) {
-        log.debug("GET /?KeyWorld={}", text);
-        return filmService.searchFilmKeyWorld(text);
+    @GetMapping("/search")
+    public Collection<Film> searchFilm(@RequestParam(name = "query") String query, @RequestParam(name = "by") String by) {
+        log.debug("GET /search?query={}&by={}", query, by);
+        return filmService.searchFilm(query, by);
     }
 }

@@ -539,14 +539,14 @@ class FilmControllerTest {
                 .description("Фантастика про космос и черные дыры")
                 .build());
 
-        Collection<Film> searchResult1 = controller.searchFilm("матриц");
+        Collection<Film> searchResult1 = controller.searchFilm("матриц", "title");
 
         assertThat(searchResult1)
                 .hasSize(1)
                 .extracting(Film::getId)
                 .containsExactly(matchingByName.getId());
 
-        Collection<Film> searchResult2 = controller.searchFilm("космос");
+        Collection<Film> searchResult2 = controller.searchFilm("космос", "title");
 
         assertThat(searchResult2)
                 .hasSize(1)
@@ -555,8 +555,9 @@ class FilmControllerTest {
     }
 
     @Test
-    void searchFilmKeyWorld_shouldThrowException() {
-        assertThatThrownBy(() -> controller.searchFilm("   "))
-                .isInstanceOf(ValidationException.class);
+    void searchFilmKeyWorld_shouldReturnEmptyList() {
+        Collection<Film> result = controller.searchFilm("   ", "title");
+
+        assertThat(result).isEmpty();
     }
 }

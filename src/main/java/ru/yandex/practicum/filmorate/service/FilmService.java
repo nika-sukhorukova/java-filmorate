@@ -227,16 +227,11 @@ public class FilmService {
         return withDetails(filmStorage.findCommonFilms(userId, friendId));
     }
 
-    public Collection<Film> searchFilmKeyWorld(String keyWorld) {
-        if (keyWorld == null || keyWorld.isBlank()) {
-            throw new ValidationException("Ключевое слово для поиска не должно быть пустым");
-        }
-        Collection<Film> foundFilms = filmStorage.searchFilmKeyWorld(keyWorld);
-
-        if (foundFilms.isEmpty()) {
-            throw new NotFoundException("Фильмы по ключевому слову '" + keyWorld + "' не найдены");
+    public Collection<Film> searchFilm(String query, String by) {
+        if (query == null || query.isBlank() || by == null || by.isBlank()) {
+            return List.of();
         }
 
-        return foundFilms;
+        return filmStorage.searchFilm(query, by.toLowerCase());
     }
 }
