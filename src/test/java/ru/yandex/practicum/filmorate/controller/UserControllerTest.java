@@ -1,25 +1,40 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Тесты контроллера через реальное DB-хранилище: каждый тест работает с резидентной базой
+ * и откатывается после теста.
+ */
+@JdbcTest
+@AutoConfigureTestDatabase
+@Import(UserDbStorage.class)
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 class UserControllerTest {
+
+    private final UserDbStorage userStorage;
 
     private UserController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new UserController(new UserService(new InMemoryUserStorage()));
+        controller = new UserController(new UserService(userStorage));
     }
 
     private User.UserBuilder validUser() {
@@ -202,5 +217,28 @@ class UserControllerTest {
         User second = controller.create(validUser().email("second@mail.ru").login("second").build());
 
         assertThat(controller.getCommonFriends(first.getId(), second.getId())).isEmpty();
+    }
+
+    @Test
+    void deleteUser() {
+        User user = controller.create(validUser().build());
+        long userId = user.getId();
+
+        assertThat(controller.findById(userId)).isNotNull();
+
+        controller.deleteUser(userId);
+
+        assertThatThrownBy(() -> controller.findById(userId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Пользователь с id=" + userId + " не найден");
+    }
+
+    @Test
+    void deleteUser_shouldThrowNotFoundException() {
+        long nonExistentId = 9999L;
+
+        assertThatThrownBy(() -> controller.deleteUser(nonExistentId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Пользователь с id=" + nonExistentId + " не найден");
     }
 }

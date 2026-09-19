@@ -15,8 +15,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -98,13 +100,84 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     @Override
-    public Collection<Film> findPopular(int count) {
+    public Collection<Film> findPopular(int count, Integer genreId, Integer year) {
+        List<Object> params = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(SELECT_FILM)
+                .append(" LEFT JOIN film_likes AS l ON l.film_id = f.id");
+
+        if (genreId != null) {
+            sql.append(" JOIN film_genres AS fg ON fg.film_id = f.id AND fg.genre_id = ?");
+            params.add(genreId);
+        }
+        if (year != null) {
+            sql.append(" WHERE EXTRACT(YEAR FROM f.release_date) = ?");
+            params.add(year);
+        }
+
+        sql.append(" GROUP BY f.id, f.name, f.description, f.release_date, f.duration, f.mpa_rating_id, m.name")
+                .append(" ORDER BY COUNT(l.user_id) DESC, f.id")
+                .append(" LIMIT ?");
+        params.add(count);
+
+        return jdbcTemplate.query(sql.toString(), FILM_MAPPER, params.toArray());
+    }
+
+    @Override
+    public Collection<Film> findByDirectorSortedByYear(Long directorId) {
         String sql = SELECT_FILM
+                + " JOIN film_directors AS fd ON fd.film_id = f.id"
+                + " WHERE fd.director_id = ?"
+                + " ORDER BY f.release_date";
+        return jdbcTemplate.query(sql, FILM_MAPPER, directorId);
+    }
+
+    @Override
+    public Collection<Film> findByDirectorSortedByLikes(Long directorId) {
+        String sql = SELECT_FILM
+                + " JOIN film_directors AS fd ON fd.film_id = f.id"
                 + " LEFT JOIN film_likes AS l ON l.film_id = f.id"
-                + " GROUP BY f.id, f.name, f.description, f.release_date, f.duration, f.mpa_rating_id, m.name"
-                + " ORDER BY COUNT(l.user_id) DESC, f.id"
-                + " LIMIT ?";
-        return jdbcTemplate.query(sql, FILM_MAPPER, count);
+                + " WHERE fd.director_id = ?"
+                + " GROUP BY f.id, f.name, f.description, f.release_date,"
+                + "          f.duration, f.mpa_rating_id, m.name"
+                + " ORDER BY COUNT(l.user_id) DESC, f.id";
+        return jdbcTemplate.query(sql, FILM_MAPPER, directorId);
+    }
+
+    @Override
+    public Collection<Film> findRecommendations(Long userId) {
+        String sql = SELECT_FILM + """
+            WHERE f.id IN (
+                SELECT fl.film_id
+                FROM film_likes AS fl
+                WHERE fl.user_id IN (
+                    SELECT fl2.user_id
+                    FROM film_likes AS fl1
+                    JOIN film_likes AS fl2 ON fl1.film_id = fl2.film_id
+                    WHERE fl1.user_id = ?
+                      AND fl2.user_id <> fl1.user_id
+                    GROUP BY fl2.user_id
+                    HAVING COUNT(*) = (
+                        SELECT MAX(common_likes)
+                        FROM (
+                            SELECT COUNT(*) AS common_likes
+                            FROM film_likes AS fl3
+                            JOIN film_likes AS fl4 ON fl3.film_id = fl4.film_id
+                            WHERE fl3.user_id = ?
+                              AND fl4.user_id <> fl3.user_id
+                            GROUP BY fl4.user_id
+                        ) AS similarities
+                    )
+                )
+                AND fl.film_id NOT IN (
+                    SELECT film_id
+                    FROM film_likes
+                    WHERE user_id = ?
+                )
+            )
+            ORDER BY f.id
+            """;
+
+        return jdbcTemplate.query(sql, FILM_MAPPER, userId, userId, userId);
     }
 
     private static Film mapFilm(ResultSet rs, int rowNum) throws SQLException {
@@ -119,6 +192,23 @@ public class FilmDbStorage implements FilmStorage {
                         .name(rs.getString("mpa_name"))
                         .build())
                 .genres(new LinkedHashSet<>())
+                .directors(new LinkedHashSet<>())
                 .build();
+    }
+
+    @Override
+    public Collection<Film> findCommonFilms(Long userId, Long friendId) {
+        String sql = SELECT_FILM
+                + " WHERE EXISTS (SELECT 1 FROM film_likes AS fl1"
+                + "               WHERE fl1.film_id = f.id AND fl1.user_id = ?)"
+                + "   AND EXISTS (SELECT 1 FROM film_likes AS fl2"
+                + "               WHERE fl2.film_id = f.id AND fl2.user_id = ?)"
+                + " ORDER BY (SELECT COUNT(*) FROM film_likes AS fl3 WHERE fl3.film_id = f.id) DESC, f.id";
+        return jdbcTemplate.query(sql, FILM_MAPPER, userId, friendId);
+    }
+
+    @Override
+    public void deleteFilm(Long filmId) {
+        jdbcTemplate.update("DELETE FROM films WHERE id = ?", filmId);
     }
 }
