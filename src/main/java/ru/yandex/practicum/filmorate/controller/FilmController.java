@@ -38,8 +38,8 @@ public class FilmController {
 
     @GetMapping("/popular")
     public Collection<Film> getPopular(@RequestParam(defaultValue = DEFAULT_POPULAR_COUNT) int count,
-                                        @RequestParam(required = false) Integer genreId,
-                                        @RequestParam(required = false) Integer year) {
+                                       @RequestParam(required = false) Integer genreId,
+                                       @RequestParam(required = false) Integer year) {
         log.debug("GET /films/popular?count={}&genreId={}&year={}", count, genreId, year);
         return filmService.getPopular(count, genreId, year);
     }
@@ -87,7 +87,7 @@ public class FilmController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteFilm( @PathVariable Long id) {
+    public void deleteFilm(@PathVariable Long id) {
         log.debug("DELETE /films/{}", id);
         filmService.deleteFilm(id);
     }
