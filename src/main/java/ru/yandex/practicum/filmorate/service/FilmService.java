@@ -232,6 +232,6 @@ public class FilmService {
             return List.of();
         }
 
-        return filmStorage.searchFilm(query, by.toLowerCase());
+        return withDetails(filmStorage.searchFilm(query, by.toLowerCase()));
     }
 }
