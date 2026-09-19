@@ -123,7 +123,7 @@ public class UserDbStorage implements UserStorage {
     }
 
     @Override
-    public void deletedUser(long userId) {
+    public void deletedUser(Long userId) {
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
     }
 }
