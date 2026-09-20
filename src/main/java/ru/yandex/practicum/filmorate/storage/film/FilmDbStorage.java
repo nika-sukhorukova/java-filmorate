@@ -218,7 +218,7 @@ public class FilmDbStorage implements FilmStorage {
 
         if (by.contains("title") && by.contains("director")) {
             sql += " WHERE LOWER(f.name) LIKE ? OR LOWER(d.name) LIKE ?";
-            params = new Object[]{searchPattern, searchPattern, searchPattern};
+            params = new Object[]{searchPattern, searchPattern};
         } else if (by.contains("director")) {
             sql += " WHERE LOWER(d.name) LIKE ?";
             params = new Object[]{searchPattern};

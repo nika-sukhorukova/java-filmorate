@@ -583,22 +583,19 @@ class FilmControllerTest {
     void searchFilm_shouldFindMoviesByBothTitleAndDirector() {
         Director director = createDirector("Кристофер Нолан");
 
-        Film film1 = validFilm().name("Начало").build();
-        film1.getDirectors().add(director);
-        Film savedFilm1 = controller.create(film1);
+        Film film1 = controller.create(validFilm().name("Начало").build());
+        directorStorage.saveFilmDirectors(film1.getId(), Set.of(director));
 
-        Film savedFilm2 = controller.create(validFilm().name("Матрица").build());
+        Film film2 = controller.create(validFilm().name("Нолана записка").build());
 
         Film nonMatching = controller.create(validFilm().name("Зеленая миля").build());
 
-        Film savedFilm2Updated = controller.create(validFilm().name("Звездные войны").build());
-
-        Collection<Film> result = controller.searchFilm("Кристофер Нолан", "title,director");
+        Collection<Film> result = controller.searchFilm("нолан", "title,director");
 
         assertThat(result)
                 .hasSize(2)
                 .extracting(Film::getId)
-                .contains(savedFilm1.getId(), savedFilm2Updated.getId())
+                .contains(film1.getId(), film2.getId())
                 .doesNotContain(nonMatching.getId());
     }
 
@@ -608,9 +605,9 @@ class FilmControllerTest {
         Film greenZone = controller.create(validFilm().name("Зеленая зона").build());
         Film greenLantern = controller.create(validFilm().name("Зеленый фонарь").build());
 
-        User user1 = userController.create(createUser("Юзер 1"));
-        User user2 = userController.create(createUser("Юзер 2"));
-        User user3 = userController.create(createUser("Юзер 3"));
+        User user1 = createUser("userOne");
+        User user2 = createUser("userTwo");
+        User user3 = createUser("userTree");
 
         controller.addLike(greenZone.getId(), user1.getId());
         controller.addLike(greenZone.getId(), user2.getId());
