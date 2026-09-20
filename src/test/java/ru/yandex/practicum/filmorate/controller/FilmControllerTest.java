@@ -560,4 +560,73 @@ class FilmControllerTest {
 
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void searchFilm_shouldFindMoviesByDirectorOnly() {
+        Director director = createDirector("Кристофер Нолан");
+
+        Film nolanFilm = validFilm().name("Начало").build();
+        nolanFilm.getDirectors().add(director);
+        Film savedNolanFilm = controller.create(nolanFilm);
+
+        Film otherFilm = controller.create(validFilm().name("Матрица").build());
+
+        Collection<Film> result = controller.searchFilm("нолан", "director");
+
+        assertThat(result)
+                .hasSize(1)
+                .extracting(Film::getId)
+                .containsExactly(savedNolanFilm.getId());
+    }
+
+    @Test
+    void searchFilm_shouldFindMoviesByBothTitleAndDirector() {
+        Director director = createDirector("Кристофер Нолан");
+
+        Film film1 = validFilm().name("Начало").build();
+        film1.getDirectors().add(director);
+        Film savedFilm1 = controller.create(film1);
+
+        Film savedFilm2 = controller.create(validFilm().name("Матрица").build());
+
+        Film nonMatching = controller.create(validFilm().name("Зеленая миля").build());
+
+        Film savedFilm2Updated = controller.create(validFilm().name("Звездные войны").build());
+
+        Collection<Film> result = controller.searchFilm("Кристофер Нолан", "title,director");
+
+        assertThat(result)
+                .hasSize(2)
+                .extracting(Film::getId)
+                .contains(savedFilm1.getId(), savedFilm2Updated.getId())
+                .doesNotContain(nonMatching.getId());
+    }
+
+    @Test
+    void searchFilm_shouldSortResultsByPopularity() {
+        Film greenMile = controller.create(validFilm().name("Зеленая миля").build());
+        Film greenZone = controller.create(validFilm().name("Зеленая зона").build());
+        Film greenLantern = controller.create(validFilm().name("Зеленый фонарь").build());
+
+        User user1 = userController.create(createUser("Юзер 1"));
+        User user2 = userController.create(createUser("Юзер 2"));
+        User user3 = userController.create(createUser("Юзер 3"));
+
+        controller.addLike(greenZone.getId(), user1.getId());
+        controller.addLike(greenZone.getId(), user2.getId());
+        controller.addLike(greenZone.getId(), user3.getId());
+
+        controller.addLike(greenMile.getId(), user1.getId());
+
+        Collection<Film> result = controller.searchFilm("зелен", "title");
+
+        assertThat(result)
+                .hasSize(3)
+                .extracting(Film::getId)
+                .containsExactly(
+                        greenZone.getId(),
+                        greenMile.getId(),
+                        greenLantern.getId()
+                );
+    }
 }
