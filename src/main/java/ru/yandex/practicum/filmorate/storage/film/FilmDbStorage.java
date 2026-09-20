@@ -232,4 +232,9 @@ public class FilmDbStorage implements FilmStorage {
 
         return jdbcTemplate.query(sql, FILM_MAPPER, params);
     }
+
+    @Override
+    public void deleteFilm(Long filmId) {
+        jdbcTemplate.update("DELETE FROM films WHERE id = ?", filmId);
+    }
 }

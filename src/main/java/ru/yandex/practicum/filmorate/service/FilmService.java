@@ -212,7 +212,7 @@ public class FilmService {
                         "Режиссёр с id=" + directorId + " не найден"));
 
         Collection<Film> films = switch (sortBy) {
-            case "year" -> filmStorage.findByDirectorSortedByYear(directorId);
+            case "year"  -> filmStorage.findByDirectorSortedByYear(directorId);
             case "likes" -> filmStorage.findByDirectorSortedByLikes(directorId);
             default -> throw new ValidationException(
                     "Параметр sortBy должен быть 'year' или 'likes', получено: " + sortBy);
@@ -233,5 +233,10 @@ public class FilmService {
         }
 
         return withDetails(filmStorage.searchFilm(query, by.toLowerCase()));
+    }
+
+    public void deleteFilm(Long filmId) {
+        findById(filmId);
+        filmStorage.deleteFilm(filmId);
     }
 }
