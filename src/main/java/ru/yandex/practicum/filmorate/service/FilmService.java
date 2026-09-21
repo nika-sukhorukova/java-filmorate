@@ -115,6 +115,10 @@ public class FilmService {
         return withDetails(filmStorage.findPopular(count, genreId, year));
     }
 
+    public Collection<Film> findRecommendations(Long userId) {
+        return withDetails(filmStorage.findRecommendations(userId));
+    }
+
     private Collection<Film> withDetails(Collection<Film> films) {
         if (films.isEmpty()) {
             return films;
