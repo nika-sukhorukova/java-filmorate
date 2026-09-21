@@ -569,7 +569,7 @@ class FilmControllerTest {
         nolanFilm.getDirectors().add(director);
         Film savedNolanFilm = controller.create(nolanFilm);
 
-        Film otherFilm = controller.create(validFilm().name("Матрица").build());
+        controller.create(validFilm().name("Матрица").build());
 
         Collection<Film> result = controller.searchFilm("нолан", "director");
 
@@ -596,6 +596,26 @@ class FilmControllerTest {
                 .hasSize(2)
                 .extracting(Film::getId)
                 .contains(film1.getId(), film2.getId())
+                .doesNotContain(nonMatching.getId());
+    }
+
+    @Test
+    void searchFilm_shouldFindMoviesByDescriptionWhenBothTitleAndDirector() {
+        Film byDescription = controller.create(validFilm()
+                .name("Начало")
+                .description("Фильм про космос и черные дыры")
+                .build());
+
+        Film nonMatching = controller.create(validFilm()
+                .name("Зеленая миля")
+                .description("Обычное описание")
+                .build());
+
+        Collection<Film> result = controller.searchFilm("космос", "title,director");
+
+        assertThat(result)
+                .extracting(Film::getId)
+                .containsExactly(byDescription.getId())
                 .doesNotContain(nonMatching.getId());
     }
 
