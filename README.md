@@ -46,9 +46,12 @@
 | `DELETE /reviews/{id}` | удаление отзыва |
 | `GET /reviews/{id}` | отзыв по идентификатору |
 | `GET /reviews?filmId={filmId}&count={count}` | отзывы по фильму (без `filmId` — по всем), отсортированные по рейтингу полезности; `count` по умолчанию 10 |
-| `PUT /reviews/{id}/like/{userId}`, `PUT /reviews/{id}/dislike/{userId}` | оценить отзыв как полезный/бесполезный |
-| `DELETE /reviews/{id}/like/{userId}`, `DELETE /reviews/{id}/dislike/{userId}` | снять оценку полезности отзыва |
-
+| `PUT /reviews/{id}/like/{userId}`, `PUT /reviews/{id}/dislike/{userId}` | оценить отзыв как полезный/бесполезный                                                                     |
+| `DELETE /reviews/{id}/like/{userId}`, `DELETE /reviews/{id}/dislike/{userId}` | снять оценку полезности отзыва                                                                             |
+| `GET /films/director/{directorId}?sortBy=` | фильмы режиссёра, отсортированные по году выпуска (year) или количеству лайков (likes)                     |
+|`GET /directors`, `GET /directors/{id}` | все режиссёры, режиссёр по идентификатору |                                                                 |
+|`POST /directors`, `PUT /directors` | 	создание и обновление режиссёра |                                                                          
+|`DELETE /directors/{id}`	| удаление режиссёра |                                                                                       
 При создании и обновлении фильма достаточно передать идентификаторы: `"mpa": {"id": 3}` и
 `"genres": [{"id": 1}, {"id": 2}]`. В ответе возвращаются полные объекты с названиями,
 жанры — без дубликатов и упорядоченные по идентификатору. Рейтинг обязателен: запрос без
