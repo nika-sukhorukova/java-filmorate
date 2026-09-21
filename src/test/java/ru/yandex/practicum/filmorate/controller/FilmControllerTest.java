@@ -9,11 +9,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
-import ru.yandex.practicum.filmorate.model.Director;
-import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.model.Mpa;
-import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.*;
 import ru.yandex.practicum.filmorate.service.EventService;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
@@ -47,6 +43,7 @@ class FilmControllerTest {
 
     private FilmController controller;
     private UserController userController;
+    private FeedController feedController;
 
     @BeforeEach
     void setUp() {
@@ -67,6 +64,8 @@ class FilmControllerTest {
         userController = new UserController(
                 new UserService(userStorage, eventService)
         );
+
+        feedController = new FeedController(eventService);
     }
 
     private Film.FilmBuilder validFilm() {
@@ -175,6 +174,23 @@ class FilmControllerTest {
         assertThat(controller.getPopular(10, null, null)).first()
                 .extracting(Film::getId)
                 .isEqualTo(likedByTwoUsers.getId());
+    }
+
+    @Test
+    void addLike_addsEventToUserFeed() {
+        Film film = controller.create(validFilm().build());
+        User user = createUser("liker");
+
+        controller.addLike(film.getId(), user.getId());
+
+        assertThat(feedController.getFeed(user.getId()))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getUserId()).isEqualTo(user.getId());
+                    assertThat(event.getEntityId()).isEqualTo(film.getId());
+                    assertThat(event.getEventType()).isEqualTo(EventType.LIKE);
+                    assertThat(event.getOperation()).isEqualTo(EventOperation.ADD);
+                });
     }
 
     @Test
