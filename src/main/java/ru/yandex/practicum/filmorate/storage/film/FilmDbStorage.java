@@ -146,36 +146,36 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public Collection<Film> findRecommendations(Long userId) {
         String sql = SELECT_FILM + """
-            WHERE f.id IN (
-                SELECT fl.film_id
-                FROM film_likes AS fl
-                WHERE fl.user_id IN (
-                    SELECT fl2.user_id
-                    FROM film_likes AS fl1
-                    JOIN film_likes AS fl2 ON fl1.film_id = fl2.film_id
-                    WHERE fl1.user_id = ?
-                      AND fl2.user_id <> fl1.user_id
-                    GROUP BY fl2.user_id
-                    HAVING COUNT(*) = (
-                        SELECT MAX(common_likes)
-                        FROM (
-                            SELECT COUNT(*) AS common_likes
-                            FROM film_likes AS fl3
-                            JOIN film_likes AS fl4 ON fl3.film_id = fl4.film_id
-                            WHERE fl3.user_id = ?
-                              AND fl4.user_id <> fl3.user_id
-                            GROUP BY fl4.user_id
-                        ) AS similarities
+                WHERE f.id IN (
+                    SELECT fl.film_id
+                    FROM film_likes AS fl
+                    WHERE fl.user_id IN (
+                        SELECT fl2.user_id
+                        FROM film_likes AS fl1
+                        JOIN film_likes AS fl2 ON fl1.film_id = fl2.film_id
+                        WHERE fl1.user_id = ?
+                          AND fl2.user_id <> fl1.user_id
+                        GROUP BY fl2.user_id
+                        HAVING COUNT(*) = (
+                            SELECT MAX(common_likes)
+                            FROM (
+                                SELECT COUNT(*) AS common_likes
+                                FROM film_likes AS fl3
+                                JOIN film_likes AS fl4 ON fl3.film_id = fl4.film_id
+                                WHERE fl3.user_id = ?
+                                  AND fl4.user_id <> fl3.user_id
+                                GROUP BY fl4.user_id
+                            ) AS similarities
+                        )
+                    )
+                    AND fl.film_id NOT IN (
+                        SELECT film_id
+                        FROM film_likes
+                        WHERE user_id = ?
                     )
                 )
-                AND fl.film_id NOT IN (
-                    SELECT film_id
-                    FROM film_likes
-                    WHERE user_id = ?
-                )
-            )
-            ORDER BY f.id
-            """;
+                ORDER BY f.id
+                """;
 
         return jdbcTemplate.query(sql, FILM_MAPPER, userId, userId, userId);
     }
@@ -205,5 +205,36 @@ public class FilmDbStorage implements FilmStorage {
                 + "               WHERE fl2.film_id = f.id AND fl2.user_id = ?)"
                 + " ORDER BY (SELECT COUNT(*) FROM film_likes AS fl3 WHERE fl3.film_id = f.id) DESC, f.id";
         return jdbcTemplate.query(sql, FILM_MAPPER, userId, friendId);
+    }
+
+    @Override
+    public Collection<Film> searchFilm(String query, String by) {
+        Object[] params;
+        String sql = SELECT_FILM + " LEFT JOIN film_likes AS l ON l.film_id = f.id"
+                + " LEFT JOIN film_directors AS fd ON fd.film_id = f.id"
+                + " LEFT JOIN directors AS d ON d.id = fd.director_id";
+
+        String searchPattern = "%" + query.trim().toLowerCase() + "%";
+
+        if (by.contains("title") && by.contains("director")) {
+            sql += " WHERE LOWER(f.name) LIKE ? OR LOWER(d.name) LIKE ?";
+            params = new Object[]{searchPattern, searchPattern};
+        } else if (by.contains("director")) {
+            sql += " WHERE LOWER(d.name) LIKE ?";
+            params = new Object[]{searchPattern};
+        } else {
+            sql += " WHERE LOWER(f.name) LIKE ? OR LOWER(f.description) LIKE ?";
+            params = new Object[]{searchPattern, searchPattern};
+        }
+
+        sql += " GROUP BY f.id, f.name, f.description, f.release_date, f.duration, f.mpa_rating_id, m.name"
+                + " ORDER BY COUNT(l.user_id) DESC, f.id";
+
+        return jdbcTemplate.query(sql, FILM_MAPPER, params);
+    }
+
+    @Override
+    public void deleteFilm(Long filmId) {
+        jdbcTemplate.update("DELETE FROM films WHERE id = ?", filmId);
     }
 }

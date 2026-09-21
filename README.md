@@ -22,26 +22,27 @@
 
 ## Эндпоинты
 
-| Метод и путь | Назначение                                                                                                 |
-|---|------------------------------------------------------------------------------------------------------------|
-| `GET /users`, `GET /users/{id}` | все пользователи, пользователь по идентификатору                                                           |
-| `POST /users`, `PUT /users` | создание и обновление пользователя                                                                         |
-| `PUT /users/{id}/friends/{friendId}` | добавить друга (связь односторонняя)                                                                       |
-| `DELETE /users/{id}/friends/{friendId}` | удалить друга из своего списка                                                                             |
-| `GET /users/{id}/friends` | друзья пользователя                                                                                        |
-| `GET /users/{id}/friends/common/{otherId}` | общие друзья двух пользователей                                                                            |
-| `GET /users/{id}/feed` | лента событий пользователя                                                                                 |
-| `GET /films`, `GET /films/{id}` | все фильмы, фильм по идентификатору                                                                        |
-| `POST /films`, `PUT /films` | создание и обновление фильма                                                                               |
-| `PUT /films/{id}/like/{userId}` | поставить лайк                                                                                             |
-| `DELETE /films/{id}/like/{userId}` | снять лайк                                                                                                 |
-| `GET /films/popular?count=N&genreId=&year=` | N самых популярных фильмов; `genreId`/`year` необязательны и фильтруют по жанру/году выхода                |
-| `GET /films/common?userId={userId}&friendId={friendId}` | фильмы, лайкнутые обоими пользователями, отсортированные по популярности                                   |
-| `GET /genres`, `GET /genres/{id}` | справочник жанров                                                                                          |
-| `GET /mpa`, `GET /mpa/{id}` | справочник возрастных рейтингов                                                                            |
-| `POST /reviews`, `PUT /reviews` | создание и редактирование отзыва                                                                           |
-| `DELETE /reviews/{id}` | удаление отзыва                                                                                            |
-| `GET /reviews/{id}` | отзыв по идентификатору                                                                                    |
+| Метод и путь | Назначение |
+|---|---|
+| `GET /users`, `GET /users/{id}` | все пользователи, пользователь по идентификатору |
+| `POST /users`, `PUT /users` | создание и обновление пользователя |
+| `PUT /users/{id}/friends/{friendId}` | добавить друга (связь односторонняя) |
+| `DELETE /users/{id}/friends/{friendId}` | удалить друга из своего списка |
+| `GET /users/{id}/friends` | друзья пользователя |
+| `GET /users/{id}/friends/common/{otherId}` | общие друзья двух пользователей |
+| `GET /users/{id}/feed` | лента событий пользователя |
+| `GET /users/{id}/recommendations` | рекомендации фильмов для пользователя |
+| `GET /films`, `GET /films/{id}` | все фильмы, фильм по идентификатору |
+| `POST /films`, `PUT /films` | создание и обновление фильма |
+| `PUT /films/{id}/like/{userId}` | поставить лайк |
+| `DELETE /films/{id}/like/{userId}` | снять лайк |
+| `GET /films/popular?count=N&genreId=&year=` | N самых популярных фильмов; `genreId`/`year` необязательны и фильтруют по жанру/году выхода |
+| `GET /films/common?userId={userId}&friendId={friendId}` | фильмы, лайкнутые обоими пользователями, отсортированные по популярности |
+| `GET /genres`, `GET /genres/{id}` | справочник жанров |
+| `GET /mpa`, `GET /mpa/{id}` | справочник возрастных рейтингов |
+| `POST /reviews`, `PUT /reviews` | создание и редактирование отзыва |
+| `DELETE /reviews/{id}` | удаление отзыва |
+| `GET /reviews/{id}` | отзыв по идентификатору |
 | `GET /reviews?filmId={filmId}&count={count}` | отзывы по фильму (без `filmId` — по всем), отсортированные по рейтингу полезности; `count` по умолчанию 10 |
 | `PUT /reviews/{id}/like/{userId}`, `PUT /reviews/{id}/dislike/{userId}` | оценить отзыв как полезный/бесполезный                                                                     |
 | `DELETE /reviews/{id}/like/{userId}`, `DELETE /reviews/{id}/dislike/{userId}` | снять оценку полезности отзыва                                                                             |

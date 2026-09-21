@@ -115,6 +115,10 @@ public class FilmService {
         return withDetails(filmStorage.findPopular(count, genreId, year));
     }
 
+    public Collection<Film> findRecommendations(Long userId) {
+        return withDetails(filmStorage.findRecommendations(userId));
+    }
+
     private Collection<Film> withDetails(Collection<Film> films) {
         if (films.isEmpty()) {
             return films;
@@ -225,5 +229,18 @@ public class FilmService {
         checkUserExists(userId);
         checkUserExists(friendId);
         return withDetails(filmStorage.findCommonFilms(userId, friendId));
+    }
+
+    public Collection<Film> searchFilm(String query, String by) {
+        if (query == null || query.isBlank() || by == null || by.isBlank()) {
+            return List.of();
+        }
+
+        return withDetails(filmStorage.searchFilm(query, by.toLowerCase()));
+    }
+
+    public void deleteFilm(Long filmId) {
+        findById(filmId);
+        filmStorage.deleteFilm(filmId);
     }
 }

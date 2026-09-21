@@ -38,8 +38,8 @@ public class FilmController {
 
     @GetMapping("/popular")
     public Collection<Film> getPopular(@RequestParam(defaultValue = DEFAULT_POPULAR_COUNT) int count,
-                                        @RequestParam(required = false) Integer genreId,
-                                        @RequestParam(required = false) Integer year) {
+                                       @RequestParam(required = false) Integer genreId,
+                                       @RequestParam(required = false) Integer year) {
         log.debug("GET /films/popular?count={}&genreId={}&year={}", count, genreId, year);
         return filmService.getPopular(count, genreId, year);
     }
@@ -84,5 +84,17 @@ public class FilmController {
     public Collection<Film> findCommonFilms(@RequestParam Long userId, @RequestParam Long friendId) {
         log.debug("GET /films/common?userId={}&friendId={}", userId, friendId);
         return filmService.findCommonFilms(userId, friendId);
+    }
+
+    @GetMapping("/search")
+    public Collection<Film> searchFilm(@RequestParam(name = "query") String query, @RequestParam(name = "by") String by) {
+        log.debug("GET /search?query={}&by={}", query, by);
+        return filmService.searchFilm(query, by);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteFilm(@PathVariable Long id) {
+        log.debug("DELETE /films/{}", id);
+        filmService.deleteFilm(id);
     }
 }
