@@ -31,6 +31,7 @@
 | `GET /users/{id}/friends` | друзья пользователя |
 | `GET /users/{id}/friends/common/{otherId}` | общие друзья двух пользователей |
 | `GET /users/{id}/feed` | лента событий пользователя |
+| `GET /users/{id}/recommendations` | рекомендации фильмов для пользователя |
 | `GET /films`, `GET /films/{id}` | все фильмы, фильм по идентификатору |
 | `POST /films`, `PUT /films` | создание и обновление фильма |
 | `PUT /films/{id}/like/{userId}` | поставить лайк |
