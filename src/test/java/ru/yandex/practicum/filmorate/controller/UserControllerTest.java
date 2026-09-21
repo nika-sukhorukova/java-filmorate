@@ -9,6 +9,9 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.Event;
+import ru.yandex.practicum.filmorate.model.EventOperation;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.EventService;
 import ru.yandex.practicum.filmorate.service.UserService;
@@ -16,6 +19,7 @@ import ru.yandex.practicum.filmorate.storage.event.EventDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
+import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,11 +38,17 @@ class UserControllerTest {
     private final EventDbStorage eventStorage;
 
     private UserController controller;
+    private FeedController feedController;
 
     @BeforeEach
     void setUp() {
         EventService eventService = new EventService(eventStorage, userStorage);
-        controller = new UserController(new UserService(userStorage, eventService));
+
+        controller = new UserController(
+                new UserService(userStorage, eventService)
+        );
+
+        feedController = new FeedController(eventService);
     }
 
     private User.UserBuilder validUser() {
@@ -142,6 +152,33 @@ class UserControllerTest {
 
         assertThat(controller.getFriends(first.getId())).containsExactly(second);
         assertThat(controller.getFriends(second.getId())).isEmpty();
+    }
+
+    @Test
+    void addFriend_addsEventToUserFeed() {
+        User first = controller.create(validUser().build());
+        User second = controller.create(
+                validUser()
+                        .email("other@mail.ru")
+                        .login("other")
+                        .build()
+        );
+
+        controller.addFriend(first.getId(), second.getId());
+
+        Collection<Event> firstFeed = feedController.getFeed(first.getId());
+        Collection<Event> secondFeed = feedController.getFeed(second.getId());
+
+        assertThat(secondFeed).isEmpty();
+
+        assertThat(firstFeed)
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getUserId()).isEqualTo(first.getId());
+                    assertThat(event.getEntityId()).isEqualTo(second.getId());
+                    assertThat(event.getEventType()).isEqualTo(EventType.FRIEND);
+                    assertThat(event.getOperation()).isEqualTo(EventOperation.ADD);
+                });
     }
 
     @Test
