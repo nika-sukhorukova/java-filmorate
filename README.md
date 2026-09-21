@@ -26,6 +26,7 @@
 |---|---|
 | `GET /users`, `GET /users/{id}` | все пользователи, пользователь по идентификатору |
 | `POST /users`, `PUT /users` | создание и обновление пользователя |
+| `DELETE /users/{id}` | удаление пользователя |
 | `PUT /users/{id}/friends/{friendId}` | добавить друга (связь односторонняя) |
 | `DELETE /users/{id}/friends/{friendId}` | удалить друга из своего списка |
 | `GET /users/{id}/friends` | друзья пользователя |
@@ -34,6 +35,7 @@
 | `GET /users/{id}/recommendations` | рекомендации фильмов для пользователя |
 | `GET /films`, `GET /films/{id}` | все фильмы, фильм по идентификатору |
 | `POST /films`, `PUT /films` | создание и обновление фильма |
+| `DELETE /films/{id}` | удаление фильма |
 | `PUT /films/{id}/like/{userId}` | поставить лайк |
 | `DELETE /films/{id}/like/{userId}` | снять лайк |
 | `GET /films/popular?count=N&genreId=&year=` | N самых популярных фильмов; `genreId`/`year` необязательны и фильтруют по жанру/году выхода |

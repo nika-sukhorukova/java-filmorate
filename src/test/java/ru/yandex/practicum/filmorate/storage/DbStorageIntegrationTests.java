@@ -906,4 +906,48 @@ class DbStorageIntegrationTests {
             filmStorage.addLike(film.getId(), user.getId());
         }
     }
+
+    @Test
+    void deleteFilm_cascadesLikesGenresDirectorsAndReviews() {
+        User user = userStorage.create(validUser("author").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+        Director director = directorStorage.create(Director.builder().name("Реж").build());
+
+        filmStorage.addLike(film.getId(), user.getId());
+        filmGenreStorage.save(film.getId(), List.of(Genre.builder().id(1).build()));
+        directorStorage.saveFilmDirectors(film.getId(), List.of(director));
+        reviewStorage.create(validReview(user.getId(), film.getId()).build());
+
+        filmStorage.deleteFilm(film.getId());
+
+        assertThat(count("film_likes", "film_id", film.getId())).isZero();
+        assertThat(count("film_genres", "film_id", film.getId())).isZero();
+        assertThat(count("film_directors", "film_id", film.getId())).isZero();
+        assertThat(count("reviews", "film_id", film.getId())).isZero();
+    }
+
+    @Test
+    void deletedUser_cascadesLikesFriendshipsReviewsAndReviewLikes() {
+        User user = userStorage.create(validUser("target").build());
+        User other = userStorage.create(validUser("other").build());
+        Film film = filmStorage.create(validFilm("Фильм").build());
+
+        filmStorage.addLike(film.getId(), user.getId());
+        userStorage.addFriend(user.getId(), other.getId());
+        Review review = reviewStorage.create(validReview(user.getId(), film.getId()).build());
+        reviewStorage.addLike(review.getReviewId(), other.getId());
+
+        userStorage.deletedUser(user.getId());
+
+        assertThat(count("film_likes", "user_id", user.getId())).isZero();
+        assertThat(count("friendships", "user_id", user.getId())).isZero();
+        assertThat(count("reviews", "user_id", user.getId())).isZero();
+        assertThat(count("review_likes", "user_id", user.getId())).isZero();
+    }
+
+    private int count(String table, String column, Long id) {
+        Integer result = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE " + column + " = ?", Integer.class, id);
+        return result == null ? 0 : result;
+    }
 }
