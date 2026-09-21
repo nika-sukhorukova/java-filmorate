@@ -227,6 +227,14 @@ public class FilmService {
         return withDetails(filmStorage.findCommonFilms(userId, friendId));
     }
 
+    public Collection<Film> searchFilm(String query, String by) {
+        if (query == null || query.isBlank() || by == null || by.isBlank()) {
+            return List.of();
+        }
+
+        return withDetails(filmStorage.searchFilm(query, by.toLowerCase()));
+    }
+
     public void deleteFilm(Long filmId) {
         findById(filmId);
         filmStorage.deleteFilm(filmId);

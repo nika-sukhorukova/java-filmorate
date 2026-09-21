@@ -25,6 +25,7 @@ import ru.yandex.practicum.filmorate.storage.genre.GenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.mpa.MpaDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -524,6 +525,106 @@ class FilmControllerTest {
                     assertThat(f.getDirectors()).isNotEmpty();
                     assertThat(f.getGenres()).isNotEmpty();
                 });
+    }
+
+    @Test
+    void searchFilmKeyWorld_shouldFindMoviesByKeyword() {
+        Film matchingByName = controller.create(validFilm()
+                .name("Матрица")
+                .description("Обычное описание")
+                .build());
+
+        Film matchingByDescription = controller.create(validFilm()
+                .name("Интерстеллар")
+                .description("Фантастика про космос и черные дыры")
+                .build());
+
+        Collection<Film> searchResult1 = controller.searchFilm("матриц", "title");
+
+        assertThat(searchResult1)
+                .hasSize(1)
+                .extracting(Film::getId)
+                .containsExactly(matchingByName.getId());
+
+        Collection<Film> searchResult2 = controller.searchFilm("космос", "title");
+
+        assertThat(searchResult2)
+                .hasSize(1)
+                .extracting(Film::getId)
+                .containsExactly(matchingByDescription.getId());
+    }
+
+    @Test
+    void searchFilmKeyWorld_shouldReturnEmptyList() {
+        Collection<Film> result = controller.searchFilm("   ", "title");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFilm_shouldFindMoviesByDirectorOnly() {
+        Director director = createDirector("Кристофер Нолан");
+
+        Film nolanFilm = validFilm().name("Начало").build();
+        nolanFilm.getDirectors().add(director);
+        Film savedNolanFilm = controller.create(nolanFilm);
+
+        Film otherFilm = controller.create(validFilm().name("Матрица").build());
+
+        Collection<Film> result = controller.searchFilm("нолан", "director");
+
+        assertThat(result)
+                .hasSize(1)
+                .extracting(Film::getId)
+                .containsExactly(savedNolanFilm.getId());
+    }
+
+    @Test
+    void searchFilm_shouldFindMoviesByBothTitleAndDirector() {
+        Director director = createDirector("Кристофер Нолан");
+
+        Film film1 = controller.create(validFilm().name("Начало").build());
+        directorStorage.saveFilmDirectors(film1.getId(), Set.of(director));
+
+        Film film2 = controller.create(validFilm().name("Нолана записка").build());
+
+        Film nonMatching = controller.create(validFilm().name("Зеленая миля").build());
+
+        Collection<Film> result = controller.searchFilm("нолан", "title,director");
+
+        assertThat(result)
+                .hasSize(2)
+                .extracting(Film::getId)
+                .contains(film1.getId(), film2.getId())
+                .doesNotContain(nonMatching.getId());
+    }
+
+    @Test
+    void searchFilm_shouldSortResultsByPopularity() {
+        Film greenMile = controller.create(validFilm().name("Зеленая миля").build());
+        Film greenZone = controller.create(validFilm().name("Зеленая зона").build());
+        Film greenLantern = controller.create(validFilm().name("Зеленый фонарь").build());
+
+        User user1 = createUser("userOne");
+        User user2 = createUser("userTwo");
+        User user3 = createUser("userTree");
+
+        controller.addLike(greenZone.getId(), user1.getId());
+        controller.addLike(greenZone.getId(), user2.getId());
+        controller.addLike(greenZone.getId(), user3.getId());
+
+        controller.addLike(greenMile.getId(), user1.getId());
+
+        Collection<Film> result = controller.searchFilm("зелен", "title");
+
+        assertThat(result)
+                .hasSize(3)
+                .extracting(Film::getId)
+                .containsExactly(
+                        greenZone.getId(),
+                        greenMile.getId(),
+                        greenLantern.getId()
+                );
     }
 
     @Test
