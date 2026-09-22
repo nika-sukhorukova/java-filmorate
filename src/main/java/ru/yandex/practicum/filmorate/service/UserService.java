@@ -86,14 +86,14 @@ public class UserService {
         return userStorage.findCommonFriends(id, otherId);
     }
 
+    public void deleteUser(Long userId) {
+        findById(userId);
+        userStorage.deletedUser(userId);
+    }
+
     private void applyNameFallback(User user) {
         if (user.getName() == null || user.getName().isBlank()) {
             user.setName(user.getLogin());
         }
-    }
-
-    public void deleteUser(Long userId) {
-        findById(userId);
-        userStorage.deletedUser(userId);
     }
 }

@@ -180,22 +180,6 @@ public class FilmDbStorage implements FilmStorage {
         return jdbcTemplate.query(sql, FILM_MAPPER, userId, userId, userId);
     }
 
-    private static Film mapFilm(ResultSet rs, int rowNum) throws SQLException {
-        return Film.builder()
-                .id(rs.getLong("id"))
-                .name(rs.getString("name"))
-                .description(rs.getString("description"))
-                .releaseDate(rs.getDate("release_date").toLocalDate())
-                .duration(rs.getInt("duration"))
-                .mpa(Mpa.builder()
-                        .id(rs.getInt("mpa_rating_id"))
-                        .name(rs.getString("mpa_name"))
-                        .build())
-                .genres(new LinkedHashSet<>())
-                .directors(new LinkedHashSet<>())
-                .build();
-    }
-
     @Override
     public Collection<Film> findCommonFilms(Long userId, Long friendId) {
         String sql = SELECT_FILM
@@ -236,5 +220,21 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public void deleteFilm(Long filmId) {
         jdbcTemplate.update("DELETE FROM films WHERE id = ?", filmId);
+    }
+
+    private static Film mapFilm(ResultSet rs, int rowNum) throws SQLException {
+        return Film.builder()
+                .id(rs.getLong("id"))
+                .name(rs.getString("name"))
+                .description(rs.getString("description"))
+                .releaseDate(rs.getDate("release_date").toLocalDate())
+                .duration(rs.getInt("duration"))
+                .mpa(Mpa.builder()
+                        .id(rs.getInt("mpa_rating_id"))
+                        .name(rs.getString("mpa_name"))
+                        .build())
+                .genres(new LinkedHashSet<>())
+                .directors(new LinkedHashSet<>())
+                .build();
     }
 }

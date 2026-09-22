@@ -119,6 +119,40 @@ public class FilmService {
         return withDetails(filmStorage.findRecommendations(userId));
     }
 
+    public Collection<Film> findByDirector(Long directorId, String sortBy) {
+        directorStorage.findById(directorId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Режиссёр с id=" + directorId + " не найден"));
+
+        Collection<Film> films = switch (sortBy) {
+            case "year"  -> filmStorage.findByDirectorSortedByYear(directorId);
+            case "likes" -> filmStorage.findByDirectorSortedByLikes(directorId);
+            default -> throw new ValidationException(
+                    "Параметр sortBy должен быть 'year' или 'likes', получено: " + sortBy);
+        };
+
+        return withDetails(films);
+    }
+
+    public Collection<Film> findCommonFilms(Long userId, Long friendId) {
+        checkUserExists(userId);
+        checkUserExists(friendId);
+        return withDetails(filmStorage.findCommonFilms(userId, friendId));
+    }
+
+    public Collection<Film> searchFilm(String query, String by) {
+        if (query == null || query.isBlank() || by == null || by.isBlank()) {
+            return List.of();
+        }
+
+        return withDetails(filmStorage.searchFilm(query, by.toLowerCase()));
+    }
+
+    public void deleteFilm(Long filmId) {
+        findById(filmId);
+        filmStorage.deleteFilm(filmId);
+    }
+
     private Collection<Film> withDetails(Collection<Film> films) {
         if (films.isEmpty()) {
             return films;
@@ -208,39 +242,5 @@ public class FilmService {
         }
 
         film.setDirectors(resolved);
-    }
-
-    public Collection<Film> findByDirector(Long directorId, String sortBy) {
-        directorStorage.findById(directorId)
-                .orElseThrow(() -> new NotFoundException(
-                        "Режиссёр с id=" + directorId + " не найден"));
-
-        Collection<Film> films = switch (sortBy) {
-            case "year"  -> filmStorage.findByDirectorSortedByYear(directorId);
-            case "likes" -> filmStorage.findByDirectorSortedByLikes(directorId);
-            default -> throw new ValidationException(
-                    "Параметр sortBy должен быть 'year' или 'likes', получено: " + sortBy);
-        };
-
-        return withDetails(films);
-    }
-
-    public Collection<Film> findCommonFilms(Long userId, Long friendId) {
-        checkUserExists(userId);
-        checkUserExists(friendId);
-        return withDetails(filmStorage.findCommonFilms(userId, friendId));
-    }
-
-    public Collection<Film> searchFilm(String query, String by) {
-        if (query == null || query.isBlank() || by == null || by.isBlank()) {
-            return List.of();
-        }
-
-        return withDetails(filmStorage.searchFilm(query, by.toLowerCase()));
-    }
-
-    public void deleteFilm(Long filmId) {
-        findById(filmId);
-        filmStorage.deleteFilm(filmId);
     }
 }

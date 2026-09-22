@@ -105,6 +105,11 @@ public class UserDbStorage implements UserStorage {
                 USER_MAPPER, userId, otherId);
     }
 
+    @Override
+    public void deletedUser(Long userId) {
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+    }
+
     private boolean hasFriendship(Long userId, Long friendId) {
         List<Integer> found = jdbcTemplate.query(
                 "SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = ?",
@@ -120,10 +125,5 @@ public class UserDbStorage implements UserStorage {
                 .name(rs.getString("name"))
                 .birthday(rs.getDate("birthday").toLocalDate())
                 .build();
-    }
-
-    @Override
-    public void deletedUser(Long userId) {
-        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
     }
 }
