@@ -20,7 +20,24 @@ public interface FilmStorage {
     void removeLike(Long filmId, Long userId);
 
     /**
-     * Возвращает фильмы, отсортированные по числу лайков по убыванию.
+     * Возвращает фильмы, отсортированные по числу лайков по убыванию. genreId и year
+     * необязательны и фильтруют выборку по жанру и году выхода соответственно.
      */
-    Collection<Film> findPopular(int count);
+    Collection<Film> findPopular(int count, Integer genreId, Integer year);
+
+    Collection<Film> findByDirectorSortedByYear(Long directorId);
+
+    Collection<Film> findByDirectorSortedByLikes(Long directorId);
+
+    /**
+     * Возвращает фильмы, рекомендованные пользователю на основе общих лайков
+     * с другими пользователями.
+     */
+    Collection<Film> findRecommendations(Long userId);
+
+    Collection<Film> findCommonFilms(Long userId, Long friendId);
+
+    Collection<Film> searchFilm(String query, String by);
+
+    void deleteFilm(Long filmId);
 }

@@ -37,9 +37,11 @@ public class FilmController {
     }
 
     @GetMapping("/popular")
-    public Collection<Film> getPopular(@RequestParam(defaultValue = DEFAULT_POPULAR_COUNT) int count) {
-        log.debug("GET /films/popular?count={}", count);
-        return filmService.getPopular(count);
+    public Collection<Film> getPopular(@RequestParam(defaultValue = DEFAULT_POPULAR_COUNT) int count,
+                                       @RequestParam(required = false) Integer genreId,
+                                       @RequestParam(required = false) Integer year) {
+        log.debug("GET /films/popular?count={}&genreId={}&year={}", count, genreId, year);
+        return filmService.getPopular(count, genreId, year);
     }
 
     @GetMapping("/{id}")
@@ -68,5 +70,31 @@ public class FilmController {
     public void removeLike(@PathVariable Long id, @PathVariable Long userId) {
         log.debug("DELETE /films/{}/like/{}", id, userId);
         filmService.removeLike(id, userId);
+    }
+
+    @GetMapping("/director/{directorId}")
+    public Collection<Film> findByDirector(
+            @PathVariable Long directorId,
+            @RequestParam(defaultValue = "year") String sortBy) {
+        log.debug("GET /films/director/{}?sortBy={}", directorId, sortBy);
+        return filmService.findByDirector(directorId, sortBy);
+    }
+
+    @GetMapping("/common")
+    public Collection<Film> findCommonFilms(@RequestParam Long userId, @RequestParam Long friendId) {
+        log.debug("GET /films/common?userId={}&friendId={}", userId, friendId);
+        return filmService.findCommonFilms(userId, friendId);
+    }
+
+    @GetMapping("/search")
+    public Collection<Film> searchFilm(@RequestParam(name = "query") String query, @RequestParam(name = "by") String by) {
+        log.debug("GET /search?query={}&by={}", query, by);
+        return filmService.searchFilm(query, by);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteFilm(@PathVariable Long id) {
+        log.debug("DELETE /films/{}", id);
+        filmService.deleteFilm(id);
     }
 }

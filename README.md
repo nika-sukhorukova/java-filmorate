@@ -13,10 +13,12 @@
 
 Доступ к данным изолирован в DAO: `UserDbStorage`, `FilmDbStorage`, `GenreDbStorage`,
 `FilmGenreDbStorage` и `MpaDbStorage` реализуют интерфейсы хранилищ поверх `JdbcTemplate` —
-каждое работает со своей таблицей, а связывает фильм с жанрами сервисный слой. Сервисы
-получают нужную реализацию через `@Qualifier`, а интеграционные тесты
+каждое работает со своей таблицей, а связывает фильм с жанрами сервисный слой. У каждого
+интерфейса хранилища теперь ровно одна реализация, поэтому сервисы получают её через
+обычное внедрение зависимостей без `@Qualifier`. Интеграционные тесты
 (`DbStorageIntegrationTests`, аннотация `@JdbcTest`) проверяют все публичные методы
-хранилищ на чистой базе.
+хранилищ на чистой базе, а `FilmControllerTest`/`UserControllerTest` тем же способом
+проверяют бизнес-логику сервисного и контроллерного слоя.
 
 ## Эндпоинты
 
@@ -24,18 +26,32 @@
 |---|---|
 | `GET /users`, `GET /users/{id}` | все пользователи, пользователь по идентификатору |
 | `POST /users`, `PUT /users` | создание и обновление пользователя |
+| `DELETE /users/{id}` | удаление пользователя |
 | `PUT /users/{id}/friends/{friendId}` | добавить друга (связь односторонняя) |
 | `DELETE /users/{id}/friends/{friendId}` | удалить друга из своего списка |
 | `GET /users/{id}/friends` | друзья пользователя |
 | `GET /users/{id}/friends/common/{otherId}` | общие друзья двух пользователей |
+| `GET /users/{id}/feed` | лента событий пользователя |
+| `GET /users/{id}/recommendations` | рекомендации фильмов для пользователя |
 | `GET /films`, `GET /films/{id}` | все фильмы, фильм по идентификатору |
 | `POST /films`, `PUT /films` | создание и обновление фильма |
+| `DELETE /films/{id}` | удаление фильма |
 | `PUT /films/{id}/like/{userId}` | поставить лайк |
 | `DELETE /films/{id}/like/{userId}` | снять лайк |
-| `GET /films/popular?count=N` | N самых популярных фильмов |
+| `GET /films/popular?count=N&genreId=&year=` | N самых популярных фильмов; `genreId`/`year` необязательны и фильтруют по жанру/году выхода |
+| `GET /films/common?userId={userId}&friendId={friendId}` | фильмы, лайкнутые обоими пользователями, отсортированные по популярности |
 | `GET /genres`, `GET /genres/{id}` | справочник жанров |
 | `GET /mpa`, `GET /mpa/{id}` | справочник возрастных рейтингов |
-
+| `POST /reviews`, `PUT /reviews` | создание и редактирование отзыва |
+| `DELETE /reviews/{id}` | удаление отзыва |
+| `GET /reviews/{id}` | отзыв по идентификатору |
+| `GET /reviews?filmId={filmId}&count={count}` | отзывы по фильму (без `filmId` — по всем), отсортированные по рейтингу полезности; `count` по умолчанию 10 |
+| `PUT /reviews/{id}/like/{userId}`, `PUT /reviews/{id}/dislike/{userId}` | оценить отзыв как полезный/бесполезный                                                                     |
+| `DELETE /reviews/{id}/like/{userId}`, `DELETE /reviews/{id}/dislike/{userId}` | снять оценку полезности отзыва                                                                             |
+| `GET /films/director/{directorId}?sortBy=` | фильмы режиссёра, отсортированные по году выпуска (year) или количеству лайков (likes)                     |
+|`GET /directors`, `GET /directors/{id}` | все режиссёры, режиссёр по идентификатору |                                                                 |
+|`POST /directors`, `PUT /directors` | 	создание и обновление режиссёра |                                                                          
+|`DELETE /directors/{id}`	| удаление режиссёра |                                                                                       
 При создании и обновлении фильма достаточно передать идентификаторы: `"mpa": {"id": 3}` и
 `"genres": [{"id": 1}, {"id": 2}]`. В ответе возвращаются полные объекты с названиями,
 жанры — без дубликатов и упорядоченные по идентификатору. Рейтинг обязателен: запрос без
@@ -93,15 +109,31 @@ erDiagram
         bigint friend_id PK, FK
         integer status_id FK
     }
+    reviews {
+        bigint id PK
+        varchar content
+        boolean is_positive
+        bigint user_id FK
+        bigint film_id FK
+    }
+    review_likes {
+        bigint review_id PK, FK
+        bigint user_id PK, FK
+        boolean is_useful
+    }
 
-    mpa_ratings         ||--o{ films       : "задаёт возрастной рейтинг"
-    films               ||--o{ film_genres : "имеет жанры"
-    genres              ||--o{ film_genres : "присвоен фильмам"
-    films               ||--o{ film_likes  : "получает лайки"
-    users               ||--o{ film_likes  : "ставит лайки"
-    users               ||--o{ friendships : "отправляет заявку"
-    users               ||--o{ friendships : "получает заявку"
-    friendship_statuses ||--o{ friendships : "определяет статус"
+    mpa_ratings         ||--o{ films        : "задаёт возрастной рейтинг"
+    films               ||--o{ film_genres  : "имеет жанры"
+    genres              ||--o{ film_genres  : "присвоен фильмам"
+    films               ||--o{ film_likes   : "получает лайки"
+    users               ||--o{ film_likes   : "ставит лайки"
+    users               ||--o{ friendships  : "отправляет заявку"
+    users               ||--o{ friendships  : "получает заявку"
+    friendship_statuses ||--o{ friendships  : "определяет статус"
+    films               ||--o{ reviews      : "получает отзывы"
+    users               ||--o{ reviews      : "пишет отзывы"
+    reviews             ||--o{ review_likes : "получает оценки полезности"
+    users               ||--o{ review_likes : "оценивает отзывы"
 ```
 
 </details>
@@ -139,6 +171,19 @@ erDiagram
 `film_likes`. Отдельная колонка означала бы два источника правды и рассинхронизацию при
 любом сбое между вставкой лайка и обновлением счётчика.
 
+**`reviews`** — отзывы на фильмы.
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `bigint` | PK, автоинкремент |
+| `content` | `varchar(1000)` | `NOT NULL`, текст отзыва |
+| `is_positive` | `boolean` | `NOT NULL`, тип отзыва: положительный/отрицательный |
+| `user_id` | `bigint` | `NOT NULL`, FK → `users.id`, автор отзыва |
+| `film_id` | `bigint` | `NOT NULL`, FK → `films.id`, фильм, на который написан отзыв |
+
+Рейтинг полезности (`useful`) в `reviews` тоже не хранится по той же причине, что и лайки
+фильмов — вычисляется по `review_likes` как сумма голосов.
+
 ### Справочники
 
 **`mpa_ratings`** — возрастные рейтинги MPA: `G`, `PG`, `PG-13`, `R`, `NC-17`.
@@ -161,6 +206,12 @@ erDiagram
 пользователь ставит фильму не более одного лайка, повторный запрос упадёт на уровне базы,
 а не на уровне проверки в сервисе.
 
+**`review_likes`** — оценки полезности отзывов. Первичный ключ составной (`review_id`,
+`user_id`): один пользователь голосует за один отзыв не более одного раза. Поле `is_useful`
+хранит сам голос («полезно»/«бесполезно»); повторное голосование другим способом (лайк
+после дизлайка и наоборот) не создаёт вторую строку, а переписывает `is_useful` через
+`MERGE`.
+
 **`friendships`** — дружеские связи. Связь односторонняя: `user_id` — тот, кто добавил
 друга, `friend_id` — тот, кого добавили, `status_id` — статус связи. В список друзей
 пользователя попадают только те, кого он добавил сам; обратная запись при этом не
@@ -177,17 +228,18 @@ erDiagram
 одной из них оставшаяся возвращается в `UNCONFIRMED`.
 
 Внешние ключи на `films` и `users` объявлены с `ON DELETE CASCADE`: при удалении фильма
-или пользователя его лайки, жанровые связи и дружеские связи уходят вместе с ним. Ссылки
-на справочники — `ON DELETE RESTRICT`, чтобы жанр или рейтинг нельзя было удалить, пока он
-используется.
+или пользователя его лайки, жанровые связи, дружеские связи, отзывы и голоса за отзывы
+уходят вместе с ним. Ссылки на справочники — `ON DELETE RESTRICT`, чтобы жанр или рейтинг
+нельзя было удалить, пока он используется.
 
 ## Соответствие нормальным формам
 
 * **1NF** — все столбцы атомарны. Жанры фильма вынесены в `film_genres`, а не в массив или
   строку с разделителями.
-* **2NF** — таблицы с составным ключом (`film_genres`, `film_likes`) не содержат
-  неключевых атрибутов вовсе, поэтому частичных зависимостей нет. В `friendships`
-  единственный неключевой атрибут `status_id` зависит от пары целиком.
+* **2NF** — таблицы с составным ключом `film_genres` и `film_likes` не содержат неключевых
+  атрибутов вовсе, поэтому частичных зависимостей нет. В `friendships` и `review_likes`
+  единственный неключевой атрибут (`status_id` и `is_useful` соответственно) зависит от
+  ключа целиком, а не от части составного ключа.
 * **3NF** — названия жанров, рейтингов и статусов хранятся в справочниках, в основных
   таблицах лежат только `id`. Транзитивных зависимостей между неключевыми полями нет,
   вычисляемых полей (вроде счётчика лайков) в схеме тоже нет.
@@ -241,6 +293,22 @@ LIMIT ?;
 
 Здесь тоже `LEFT JOIN`: фильмы без лайков должны присутствовать в выдаче, иначе на свежей
 базе топ окажется пустым.
+
+### Общие фильмы двух пользователей
+
+```sql
+SELECT f.id,
+       f.name,
+       COUNT(fl.user_id) AS likes_count
+FROM films AS f
+LEFT JOIN film_likes AS fl ON fl.film_id = f.id
+WHERE EXISTS (SELECT 1 FROM film_likes AS fl1
+              WHERE fl1.film_id = f.id AND fl1.user_id = ?)
+  AND EXISTS (SELECT 1 FROM film_likes AS fl2
+              WHERE fl2.film_id = f.id AND fl2.user_id = ?)
+GROUP BY f.id, f.name
+ORDER BY likes_count DESC, f.id;
+```
 
 ### Все пользователи
 
@@ -354,4 +422,39 @@ FROM genres AS g
 JOIN film_genres AS fg ON fg.genre_id = g.id
 WHERE fg.film_id = ?
 ORDER BY g.id;
+```
+
+### Отзывы на фильм с рейтингом полезности
+
+Рейтинг — сумма голосов: `+1` за «полезно», `-1` за «бесполезно». `LEFT JOIN` нужен, чтобы
+отзыв без единого голоса тоже попал в выдачу с рейтингом `0`, а не выпал из результата:
+
+```sql
+SELECT r.id,
+       r.content,
+       r.is_positive,
+       r.user_id,
+       r.film_id,
+       COALESCE(SUM(CASE
+                        WHEN rl.review_id IS NULL THEN 0
+                        WHEN rl.is_useful THEN 1
+                        ELSE -1
+                    END), 0) AS useful
+FROM reviews AS r
+LEFT JOIN review_likes AS rl ON rl.review_id = r.id
+WHERE r.film_id = ?
+GROUP BY r.id, r.content, r.is_positive, r.user_id, r.film_id
+ORDER BY useful DESC, r.id
+LIMIT ?;
+```
+
+### Оценка полезности отзыва
+
+`MERGE` перезаписывает голос того же пользователя, если он сначала поставил «полезно»,
+а потом передумал на «бесполезно» (и наоборот) — так на отзыв остаётся не больше одного
+голоса от каждого пользователя:
+
+```sql
+MERGE INTO review_likes (review_id, user_id, is_useful) KEY (review_id, user_id)
+VALUES (?, ?, TRUE);
 ```

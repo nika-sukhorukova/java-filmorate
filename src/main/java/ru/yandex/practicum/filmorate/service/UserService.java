@@ -1,11 +1,12 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.model.EventOperation;
+import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
@@ -13,14 +14,11 @@ import java.util.Collection;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserStorage userStorage;
-
-    @Autowired
-    public UserService(@Qualifier("userDbStorage") UserStorage userStorage) {
-        this.userStorage = userStorage;
-    }
+    private final EventService eventService;
 
     public Collection<User> findAll() {
         return userStorage.findAll();
@@ -64,6 +62,7 @@ public class UserService {
         }
 
         userStorage.addFriend(id, friendId);
+        eventService.addEvent(id, EventType.FRIEND, EventOperation.ADD, friendId);
         log.info("Пользователь {} добавил в друзья пользователя {}", id, friendId);
     }
 
@@ -72,6 +71,7 @@ public class UserService {
         findById(friendId);
 
         userStorage.removeFriend(id, friendId);
+        eventService.addEvent(id, EventType.FRIEND, EventOperation.REMOVE, friendId);
         log.info("Пользователь {} удалил из друзей пользователя {}", id, friendId);
     }
 
@@ -84,6 +84,11 @@ public class UserService {
         findById(id);
         findById(otherId);
         return userStorage.findCommonFriends(id, otherId);
+    }
+
+    public void deleteUser(Long userId) {
+        findById(userId);
+        userStorage.deletedUser(userId);
     }
 
     private void applyNameFallback(User user) {
